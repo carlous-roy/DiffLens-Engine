@@ -1,0 +1,83 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: difflens-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-difflens}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-difflens}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-difflens}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: difflens-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: difflens-app
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-difflens}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-difflens}
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://ollama:11434}
+      LLM_MODEL: ${LLM_MODEL:-codellama:7b}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-120}
+      ML_ENABLE_SMART_REVIEW: ${ML_ENABLE_SMART_REVIEW:-true}
+      ML_ENABLE_RISK_SCORING: ${ML_ENABLE_RISK_SCORING:-true}
+      ML_ENABLE_SIMILARITY: ${ML_ENABLE_SIMILARITY:-true}
+      ML_ENABLE_CATEGORIZATION: ${ML_ENABLE_CATEGORIZATION:-true}
+      # GitHub Integration
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      GITHUB_POST_COMMENT: ${GITHUB_POST_COMMENT:-true}
+      GITHUB_POST_REVIEW: ${GITHUB_POST_REVIEW:-true}
+      GITHUB_USE_CHECKS_API: ${GITHUB_USE_CHECKS_API:-false}
+      GITHUB_ANALYZE_DRAFTS: ${GITHUB_ANALYZE_DRAFTS:-false}
+      GITHUB_ENABLE_SMART_REVIEW: ${GITHUB_ENABLE_SMART_REVIEW:-false}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      - ./app:/app/app
+      - ./tests:/app/tests
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: difflens-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
+  ollama_data:
