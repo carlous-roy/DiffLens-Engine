@@ -35,7 +35,9 @@ def _to_camel_case(name: str) -> str:
     return parts[0].lower() + "".join(p.capitalize() for p in parts[1:])
 
 def check_python_naming(source_code: str, file_path: str) -> list[NamingFinding]:
-    """Check Python naming conventions:"""
+    """Check Python naming conventions: PEP 8 expects snake_case for functions
+    and variables, PascalCase for classes, and SCREAMING_SNAKE_CASE for
+    module-level constants."""
     findings: list[NamingFinding] = []
     lines = source_code.split("\n")
 
@@ -89,7 +91,9 @@ def check_python_naming(source_code: str, file_path: str) -> list[NamingFinding]
     return findings
 
 def check_java_naming(source_code: str, file_path: str) -> list[NamingFinding]:
-    """Check Java naming conventions:"""
+    """Check Java naming conventions: PascalCase for classes, interfaces and
+    enums, camelCase for methods and fields, and SCREAMING_SNAKE_CASE for
+    static final constants."""
     findings: list[NamingFinding] = []
     lines = source_code.split("\n")
 

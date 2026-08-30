@@ -37,6 +37,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-difflens}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-difflens}
       APP_ENV: ${APP_ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DASHBOARD_URL: ${DASHBOARD_URL:-http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
       LLM_BASE_URL: ${LLM_BASE_URL:-http://ollama:11434}
       LLM_MODEL: ${LLM_MODEL:-codellama:7b}
@@ -64,6 +66,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Development path: the source directories above are bind-mounted, so
+    # --reload picks up local edits. The image's own CMD has no --reload.
     command: >
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"

@@ -2,7 +2,6 @@
 import re
 import logging
 from dataclasses import dataclass, asdict
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ CLASSIFICATION_RULES = [
         re.compile(r"injection", re.IGNORECASE),
         re.compile(r"unsafe|insecure", re.IGNORECASE),
         re.compile(r"sql.*injection|xss|csrf", re.IGNORECASE),
-        re.compile(r"hardcoded.*password|secret|token", re.IGNORECASE),
+        re.compile(r"hardcoded.*(password|secret|token)", re.IGNORECASE),
     ]),
     # Correctness
     ("correctness", 0.90, [

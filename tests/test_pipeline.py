@@ -74,4 +74,11 @@ def test_pipeline_unsupported_language():
 +body {
 +    color: red;
 +}
-"""result = run_analysis(diff, enable_ml=True)"""
+"""
+    result = run_analysis(diff, enable_ml=True)
+    # The file is parsed, but CSS has no analyzer, so nothing is reported.
+    assert result.files_analyzed == 1
+    assert result.total_findings == 0
+    assert result.complexity_findings == []
+    assert result.naming_findings == []
+    assert result.bug_risk_findings == []

@@ -81,7 +81,29 @@ new file mode 100644
 +    def __init__(self):
 +        self.data = []
 +        global SHARED_STATE
-"""SAMPLE_JAVA_DIFF = """diff --git a/src/Main.java b/src/Main.java"""
+"""
+
+SAMPLE_JAVA_DIFF = """diff --git a/src/Main.java b/src/Main.java
+new file mode 100644
+--- /dev/null
++++ b/src/Main.java
+@@ -0,0 +1,15 @@
++public class dataHandler {
++    public static final int max_retries = 3;
++
++    public boolean checkName(String name) {
++        if (name.equals(null)) {
++            return false;
++        }
++        if (name == "admin") {
++            System.out.println("admin user");
++            return true;
++        }
++        // TODO: handle other roles
++        return false;
++    }
++}
+"""
 
 MINIMAL_PYTHON_DIFF = """diff --git a/clean.py b/clean.py
 new file mode 100644
@@ -93,3 +115,4 @@ new file mode 100644
 +
 +def subtract(a, b):
 +    return a - b
+"""

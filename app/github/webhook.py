@@ -18,11 +18,12 @@ def verify_webhook_signature(
     webhook_secret = secret or settings.github_webhook_secret
 
     if not webhook_secret:
-        logger.warning(
-            "GITHUB_WEBHOOK_SECRET not set — skipping signature verification. "
-            "This is INSECURE and should only be used in development."
+        logger.error(
+            "GITHUB_WEBHOOK_SECRET is not configured; rejecting the webhook "
+            "delivery. Set GITHUB_WEBHOOK_SECRET to the value configured on "
+            "the GitHub webhook to enable signature verification."
         )
-        return True
+        return False
 
     if not signature_header:
         logger.warning("No X-Hub-Signature-256 header present.")

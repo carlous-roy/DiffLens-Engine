@@ -4,9 +4,9 @@
 
 ### Features
 - Static analysis pipeline: cyclomatic complexity (Tree-sitter AST), naming convention checks (PEP 8, Java), bug risk pattern detection.
-- ML-powered risk scoring using scikit-learn gradient boosting.
-- Auto-categorization of findings into security, correctness, performance, maintainability, and style via TF-IDF.
-- Similarity search using lightweight embeddings to find historically similar findings.
+- Risk scoring via a weighted heuristic over a 15-feature vector extracted from the diff and its findings, reported with its contributing factors.
+- Auto-categorization of findings into security, correctness, performance, maintainability, and style via regex keyword rules.
+- Similarity search using TF-IDF vectors and cosine similarity to find historically similar findings.
 - Smart review via Ollama / CodeLlama for LLM-powered narrative code review.
 - GitHub webhook integration: automatic PR analysis on open/sync/reopen, commit statuses, summary comments, inline review comments, and check run annotations.
 - Manual PR analysis trigger via dashboard and REST API.

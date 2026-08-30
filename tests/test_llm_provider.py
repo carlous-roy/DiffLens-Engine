@@ -1,5 +1,4 @@
 """Tests for the LLM provider module."""
-import pytest
 from app.ml.llm_provider import LLMProvider, LLMResponse
 
 class TestLLMResponse:

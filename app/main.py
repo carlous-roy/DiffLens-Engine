@@ -14,9 +14,11 @@ app = FastAPI(
     description="ML-powered code review with static analysis, risk scoring, and GitHub integration.",
 )
 
+allowed_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,7 +33,7 @@ def root():
         "name": settings.app_name,
         "version": settings.app_version,
         "docs": "/docs",
-        "dashboard": "http://localhost:3000",
+        "dashboard": settings.dashboard_url,
         "github_webhook": "/api/v1/github/webhook",
         "github_configured": bool(settings.github_token),
     }

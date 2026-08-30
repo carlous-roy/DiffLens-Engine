@@ -1,5 +1,4 @@
 """Tests for GitHub output formatter."""
-import pytest
 from app.analysis.pipeline import AnalysisResult
 from app.github.formatter import (
     format_summary_comment,
@@ -84,7 +83,10 @@ class TestFormatSummaryComment:
 
     def test_includes_smart_review(self):
         analysis = _make_analysis()
-        sr = {"comments": [{"file": "f.py", "line": 1, "comment": "looks good"}], "summary": "Clean code."}
+        sr = {
+            "comments": [{"file": "f.py", "line": 1, "comment": "looks good"}],
+            "overall_summary": "Clean code.",
+        }
         comment = format_summary_comment(analysis, smart_review=sr)
         assert "AI Review" in comment
         assert "Clean code." in comment

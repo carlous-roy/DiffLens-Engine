@@ -1,5 +1,4 @@
 """Core REST API routes for DiffLens."""
-import asyncio
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text

@@ -1,5 +1,4 @@
-"""Code Change Risk Scoring — ML-based risk prediction."""
-import math
+"""Code Change Risk Scoring — feature extraction and risk prediction."""
 import logging
 from dataclasses import dataclass, asdict
 from typing import Optional
@@ -300,7 +299,6 @@ def score_risk(analysis_result: dict, file_diffs: Optional[list] = None) -> Risk
     """Score the risk of a code change."""
     features = extract_features(analysis_result, file_diffs)
 
-    global _trained_model
     if _trained_model is not None and _trained_model.is_trained:
         try:
             return _trained_model.predict(features)

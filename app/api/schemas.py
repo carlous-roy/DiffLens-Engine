@@ -1,8 +1,6 @@
 """Pydantic request/response models for the DiffLens API."""
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime
-from uuid import UUID
 
 class AnalyzeRequest(BaseModel):
     """Request body for the /analyze endpoint."""

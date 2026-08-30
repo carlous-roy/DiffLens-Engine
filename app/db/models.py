@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column, String, Text, DateTime, JSON, Integer,
-    ForeignKey, Enum as SAEnum, types,
+    ForeignKey, Enum as SAEnum, Index, types,
 )
 from sqlalchemy.orm import relationship
 
@@ -48,11 +48,14 @@ class SeverityLevel(str, enum.Enum):
 # Models
 
 class AnalysisRun(Base):
-    """A single analysis invocation — could be triggered by the API, the"""
+    """A single analysis invocation — triggered by the API, the GitHub webhook,
+    or a manual run, and holding the summary of everything that was found."""
     __tablename__ = "analysis_runs"
 
     id = Column(UUIDType(), primary_key=True, default=uuid.uuid4)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
+    )
     source = Column(String(50), nullable=False, default="api")
     status = Column(String(20), nullable=False, default="completed")
     summary = Column(JSON, nullable=True)
@@ -69,8 +72,13 @@ class AnalysisFinding(Base):
     __tablename__ = "analysis_findings"
 
     id = Column(UUIDType(), primary_key=True, default=uuid.uuid4)
-    run_id = Column(UUIDType(), ForeignKey("analysis_runs.id"), nullable=False)
-    analyzer = Column(String(50), nullable=False)
+    run_id = Column(
+        UUIDType(),
+        ForeignKey("analysis_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    analyzer = Column(String(50), nullable=False, index=True)
     file_path = Column(String(500), nullable=False)
     line_number = Column(Integer, nullable=True)
     severity = Column(
@@ -86,17 +94,27 @@ class AnalysisFinding(Base):
     run = relationship("AnalysisRun", back_populates="findings")
 
 class GitHubPR(Base):
-    """Tracks which GitHub PRs have been analyzed and links them back"""
+    """Tracks which GitHub pull requests have been analyzed and links each one
+    back to the analysis run that produced its findings."""
     __tablename__ = "github_prs"
 
     id = Column(UUIDType(), primary_key=True, default=uuid.uuid4)
-    run_id = Column(UUIDType(), ForeignKey("analysis_runs.id"), nullable=False)
+    run_id = Column(
+        UUIDType(),
+        ForeignKey("analysis_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     owner = Column(String(200), nullable=False)
     repo = Column(String(200), nullable=False)
     pr_number = Column(Integer, nullable=False)
-    head_sha = Column(String(40), nullable=False)
+    head_sha = Column(String(40), nullable=False, index=True)
     action = Column(String(50), nullable=False, default="opened")
     pr_url = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     run = relationship("AnalysisRun", back_populates="github_pr")
+
+    __table_args__ = (
+        Index("ix_github_prs_owner_repo_number", "owner", "repo", "pr_number"),
+    )

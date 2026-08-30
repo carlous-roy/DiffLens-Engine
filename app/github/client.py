@@ -1,6 +1,6 @@
 """GitHub REST API client for DiffLens."""
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 import httpx

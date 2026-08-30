@@ -1,10 +1,9 @@
 """PR analysis service — orchestrates the full GitHub PR review flow."""
 import logging
 from typing import Optional
-from datetime import datetime, timezone
 
 from app.analysis.pipeline import run_analysis, AnalysisResult
-from app.github.client import GitHubClient, PRInfo
+from app.github.client import GitHubClient
 from app.github.formatter import (
     format_summary_comment,
     findings_to_annotations,

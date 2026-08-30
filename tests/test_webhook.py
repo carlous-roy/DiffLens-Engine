@@ -1,8 +1,6 @@
 """Tests for GitHub webhook verification and event dispatch."""
 import hashlib
 import hmac
-import json
-import pytest
 
 from app.github.webhook import (
     verify_webhook_signature,
@@ -34,11 +32,11 @@ class TestWebhookSignature:
             b"body", None, secret="webhook-test-value"
         ) is False
 
-    def test_no_secret_configured_allows_all(self):
-        """Dev mode: no secret set → skip verification."""
+    def test_no_secret_configured_rejects(self):
+        """Fail closed: with no secret configured nothing can be verified."""
         assert verify_webhook_signature(
             b"anything", "sha256=whatever", secret=None
-        ) is True
+        ) is False
 
     def test_wrong_prefix(self):
         assert verify_webhook_signature(

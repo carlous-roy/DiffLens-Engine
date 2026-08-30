@@ -40,7 +40,7 @@ def run_analysis(diff_text: str, enable_ml: bool = True) -> AnalysisResult:
     """Run the full analysis pipeline."""
     # If the user pasted raw code instead of a diff, wrap it automatically.
     # This way the Analyze page works for both use cases.
-    if not is_unified_diff(diff_text):
+    if diff_text.strip() and not is_unified_diff(diff_text):
         diff_text = wrap_raw_code(diff_text)
 
     file_diffs = parse_diff(diff_text)
@@ -98,14 +98,14 @@ def _run_ml_modules(result: AnalysisResult, file_diffs) -> None:
     so a failure in one doesn't block the others."""
     all_flat = _flatten_findings(result)
 
-    # Risk scoring — gradient boosting model predicts low/medium/high
+    # Risk scoring — weighted heuristic over extracted diff/finding features
     try:
         risk = score_risk(result.to_dict(), file_diffs)
         result.risk_score = risk.to_dict()
     except Exception as e:
         result.risk_score = {"error": str(e)}
 
-    # Auto-categorization — TF-IDF assigns security/correctness/etc.
+    # Auto-categorization — keyword rules assign security/correctness/etc.
     try:
         cat_result = categorize_findings(all_flat)
         result.categorization = cat_result.to_dict()

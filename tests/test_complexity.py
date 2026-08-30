@@ -22,9 +22,13 @@ def process(data):
             elif item == 0:
                 continue
     return None
-"""findings = analyze_complexity(code, "test.py", "python")"""
+"""
         findings = analyze_complexity(code, "test.py", "python")
-        assert len(findings) == 2
+        assert len(findings) == 1
+        assert findings[0].function_name == "process"
+        # if / for / if / elif each add a branch on top of the base path
+        assert findings[0].complexity >= 4
+        assert findings[0].severity in ("info", "warning")
 
 @pytest.mark.skipif(not TREE_SITTER_AVAILABLE, reason="tree-sitter not installed")
 class TestJavaComplexity:
@@ -35,4 +39,9 @@ class Foo {
         return a + b;
     }
 }
-"""findings = analyze_complexity(code, "Foo.java", "java")"""
+"""
+        findings = analyze_complexity(code, "Foo.java", "java")
+        assert len(findings) == 1
+        assert findings[0].function_name == "add"
+        assert findings[0].complexity == 1
+        assert findings[0].severity == "info"

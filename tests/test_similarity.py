@@ -1,5 +1,4 @@
 """Tests for the similarity search module."""
-import pytest
 from app.ml.similarity import FindingEmbedder, get_embedder
 
 class TestFindingEmbedder:

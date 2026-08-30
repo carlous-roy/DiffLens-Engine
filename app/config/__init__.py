@@ -4,14 +4,20 @@ from functools import lru_cache
 from typing import Optional
 
 class Settings(BaseSettings):
-    # Database
-    database_url: str = "postgresql://difflens:changeme@db:5432/difflens"
+    # Database. Defaults to a local SQLite file so the app runs from a clean
+    # clone; docker-compose and any real deployment set DATABASE_URL to Postgres.
+    database_url: str = "sqlite:///./difflens.db"
 
     # App
     app_env: str = "development"
     log_level: str = "INFO"
     app_name: str = "DiffLens"
     app_version: str = "1.0.0"
+
+    # Frontend / browser clients
+    dashboard_url: str = "http://localhost:3000"
+    # Comma-separated list of origins allowed to call the API.
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     # LLM
     llm_provider: str = "ollama"

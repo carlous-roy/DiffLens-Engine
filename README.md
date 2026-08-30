@@ -12,11 +12,11 @@
 A code review engine that parses the code rather than pattern-matching the text.
 
 Many review tools match patterns against source text. DiffLens parses Python and Java into
-**Tree-sitter ASTs** first, so "this function has a cyclomatic complexity of 19 and nests four deep"
-is a measurement rather than an estimate. On top of that sits a **gradient-boosting model** that scores
-overall change risk from diff size, severity distribution and complexity signals, **TF-IDF
-categorization** that sorts findings into security, correctness, performance, maintainability and
-style, and **embedding-based similarity search** that surfaces issues this codebase has already seen.
+**Tree-sitter ASTs** first, so "this function has a cyclomatic complexity of 19" is a measurement
+rather than an estimate. On top of that sits a **weighted risk score** built from diff size, severity
+distribution and complexity signals, **keyword-rule categorization** that sorts findings into
+security, correctness, performance, maintainability and style, and **TF-IDF similarity search** that
+surfaces issues this codebase has already seen.
 
 An optional local **CodeLlama** pass rewrites findings as review comments, and GitHub webhooks run
 the analysis on every pull request: commit status, a summary comment with a findings table, and
@@ -36,13 +36,13 @@ comments land on the correct line.
 ### Static Analysis
 - **Cyclomatic Complexity**: Tree-sitter AST parsing detects overly complex functions and deep nesting in Python and Java code.
 - **Naming Conventions**: validates PEP 8 (Python) and Java naming standards for classes, functions, variables, and constants.
-- **Bug Risk Detection**: pattern matching identifies common anti-patterns: bare excepts, `eval()` usage, mutable default arguments, wildcard imports, hardcoded credentials, and more.
+- **Bug Risk Detection**: 15 rules (9 Python, 6 Java) identify common anti-patterns: bare excepts, `eval()` / `exec()` usage, mutable default arguments, wildcard imports, `global` state, `.equals(null)`, empty catch blocks, string comparison with `==`, and leftover TODO/FIXME markers.
 
-### ML-Powered Intelligence
-- **Risk Scoring**: a scikit-learn gradient boosting model predicts overall change risk (low / medium / high) based on extracted features like diff size, severity distribution, and complexity.
-- **Auto-Categorization**: TF-IDF keyword matching classifies findings into security, correctness, performance, maintainability, and style.
-- **Similarity Search**: lightweight embeddings find historically similar findings to surface recurring issues across your codebase.
-- **Smart Review**: optional LLM-powered narrative review via Ollama / CodeLlama that produces human-quality review comments.
+### Scoring and Classification
+- **Risk Scoring**: a weighted heuristic scores overall change risk (low / medium / high) over a 15-feature vector extracted from the diff and its findings: diff size, severity distribution, max and average complexity, churn ratio, naming violations, bug-risk density, and security-sensitive patterns. Every score ships with the contributing factors that produced it, so the number is explainable rather than opaque.
+- **Auto-Categorization**: regex keyword rules classify findings into security, correctness, performance, maintainability, and style, falling back to a per-analyzer default when no rule matches.
+- **Similarity Search**: TF-IDF vectors and cosine similarity find historically similar findings to surface recurring issues across your codebase. A sentence-transformers path is wired in and used automatically if that optional dependency is installed.
+- **Smart Review**: optional LLM-powered narrative review via Ollama / CodeLlama that rewrites findings as prose review comments.
 
 ### GitHub Integration
 - **Webhook Listener**: automatically analyzes pull requests when they are opened, synchronized, or reopened.
@@ -208,9 +208,9 @@ DiffLens-Engine/
 │   │   ├── bug_risk.py            # Bug risk pattern detection
 │   │   └── pipeline.py            # Orchestrates analyzers + ML modules
 │   ├── ml/                    # Machine learning modules
-│   │   ├── risk_scoring.py        # Gradient boosting risk prediction
-│   │   ├── categorization.py      # TF-IDF finding categorization
-│   │   ├── similarity.py          # Embedding-based similar finding search
+│   │   ├── risk_scoring.py        # Weighted-heuristic risk scoring
+│   │   ├── categorization.py      # Keyword-rule finding categorization
+│   │   ├── similarity.py          # TF-IDF + cosine similarity search
 │   │   ├── smart_review.py        # LLM-powered narrative review
 │   │   └── llm_provider.py        # Pluggable LLM provider abstraction
 │   ├── github/                # GitHub integration
@@ -255,8 +255,10 @@ All settings are controlled via environment variables. See `.env.example` for th
 | `ML_ENABLE_RISK_SCORING` | `true` | Enable risk score prediction |
 | `ML_ENABLE_SIMILARITY` | `true` | Enable similar finding search |
 | `ML_ENABLE_CATEGORIZATION` | `true` | Enable auto-categorization |
-| `GITHUB_TOKEN` |, | GitHub PAT for posting results |
-| `GITHUB_WEBHOOK_SECRET` |, | HMAC secret for webhook verification |
+| `DASHBOARD_URL` | `http://localhost:3000` | Frontend URL reported by the API root |
+| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated origins allowed to call the API |
+| `GITHUB_TOKEN` | _(unset)_ | GitHub PAT for posting results |
+| `GITHUB_WEBHOOK_SECRET` | _(unset)_ | HMAC secret for webhook verification. Required: the webhook endpoint rejects unsigned deliveries. |
 | `GITHUB_POST_COMMENT` | `true` | Post summary comments on PRs |
 | `GITHUB_POST_REVIEW` | `true` | Post inline review comments |
 | `GITHUB_USE_CHECKS_API` | `false` | Use Checks API for annotations |
@@ -296,21 +298,24 @@ Tests use SQLite in-memory and mock external services (GitHub API, Ollama).
 | Frontend | React 18, Vite, Tailwind CSS, Recharts, Lucide Icons |
 | Database | PostgreSQL 15 |
 | LLM | Ollama + CodeLlama 7B (optional) |
-| Infrastructure | Docker Compose, Nginx, GitHub Actions |
+| Infrastructure | Docker Compose, Nginx |
 
 ---
 
 ## What I'd do differently
 
-- **The risk model is trained on synthetic labels.** There is no corpus of "this PR caused an
-  incident", so risk is derived from the findings rather than from outcomes. The pipeline is honest
-  and the features are sensible, but calling the output a *prediction* would be overselling it. Real
-  labels would come from linking merged PRs to subsequent reverts or incident tickets.
+- **Risk scoring is a weighted heuristic, not a learned model.** The weights are hand-tuned over the
+  extracted feature vector, because there is no corpus of "this PR caused an incident" to train
+  against. The feature extraction is built so a model can take over — `TrainedRiskModel` already
+  wraps the scikit-learn fit/predict path — but nothing is trained today, and calling the output a
+  *prediction* would be overselling it. Real labels would come from linking merged PRs to subsequent
+  reverts or incident tickets.
 - **Two languages only.** Tree-sitter has grammars for dozens; the analysis rules are what is
   Python- and Java-specific. Adding a language means writing its complexity and bug-risk rules, not
   just dropping in a grammar.
-- **Similarity search is a flat scan.** Fine at this size, wrong past a few thousand findings. The
-  embeddings already exist, so this wants pgvector and an index rather than a rewrite.
+- **Similarity search is a flat scan.** Every query re-scores the whole corpus. Fine at this size,
+  wrong past a few thousand findings. The fix is a vector index — pgvector, with real embeddings in
+  place of TF-IDF — rather than a rewrite of the search itself.
 - **The LLM pass is unevaluated.** It produces comments that read well, and I have no measurement of
   whether they are *correct* more often than they are fluent. That gap is exactly the one worth
   closing next, and it needs a golden set with published numbers rather than a demo.

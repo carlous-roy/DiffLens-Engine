@@ -29,8 +29,8 @@ def format_summary_comment(
     lines = [
         "## 🔍 DiffLens Code Review",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| **Files analyzed** | {analysis.summary.get('files_analyzed', 0)} |",
         f"| **Total findings** | {analysis.total_findings} |",
         f"| **Risk level** | {risk_emoji} {risk_level.upper()} ({risk_score_val:.0%}) |",
@@ -99,7 +99,7 @@ def format_summary_comment(
             for c in comments[:5]:
                 lines.append(f"- **{c.get('file', '')}:{c.get('line', '')}** — {c.get('comment', '')}")
             lines.append("")
-        summary_text = smart_review.get("summary", "")
+        summary_text = smart_review.get("overall_summary", "")
         if summary_text:
             lines.append(f"> {summary_text}")
             lines.append("")
@@ -107,24 +107,25 @@ def format_summary_comment(
     # Categorization
     cat = analysis.categorization
     if cat and isinstance(cat, dict) and not cat.get("error"):
-        categories = cat.get("categories", [])
-        if categories:
+        category_counts = cat.get("summary", {})
+        ranked = [(name, n) for name, n in category_counts.items() if n]
+        ranked.sort(key=lambda item: item[1], reverse=True)
+        if ranked:
             lines.append("### 📂 Categories")
             lines.append("")
-            for c in categories[:5]:
-                label = c.get("label", "unknown")
-                count = c.get("count", 0)
+            for label, count in ranked[:5]:
                 lines.append(f"- **{label}**: {count} findings")
             lines.append("")
 
     lines.append("---")
-    lines.append("*Analyzed by [DiffLens](https://github.com) · ML-powered code review*")
+    lines.append("*Analyzed by [DiffLens](https://github.com/carlous-roy/DiffLens-Engine) · ML-powered code review*")
 
     return "\n".join(lines)
 
 def findings_to_annotations(analysis: AnalysisResult) -> list[dict]:
     """Convert findings into GitHub Check Run annotations."""
-    annotations = []
+    severity_order = {"critical": 0, "error": 1, "warning": 2, "info": 3}
+    ranked: list[tuple[int, dict]] = []
 
     for f in _collect_all_findings(analysis):
         severity = f.get("severity", "info")
@@ -132,7 +133,7 @@ def findings_to_annotations(analysis: AnalysisResult) -> list[dict]:
         if not line:
             continue  # Annotations require a line number
 
-        annotations.append({
+        ranked.append((severity_order.get(severity, 4), {
             "path": f.get("file_path", ""),
             "start_line": line,
             "end_line": line,
@@ -140,13 +141,11 @@ def findings_to_annotations(analysis: AnalysisResult) -> list[dict]:
             "title": f"[{f.get('analyzer', 'difflens').upper()}] {severity.capitalize()}",
             "message": f.get("message", ""),
             "raw_details": f.get("suggestion", ""),
-        })
+        }))
 
-    # Sort by severity (critical first)
-    severity_order = {"critical": 0, "error": 1, "warning": 2, "info": 3}
-    annotations.sort(key=lambda a: severity_order.get(
-        a.get("annotation_level", "notice"), 4
-    ))
+    # Sort by severity (critical first), then drop the sort key.
+    ranked.sort(key=lambda item: item[0])
+    annotations = [a for _, a in ranked]
 
     return annotations
 

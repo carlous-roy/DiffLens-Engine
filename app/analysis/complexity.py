@@ -1,4 +1,5 @@
-"""Complexity analyzer that uses Tree-sitter AST parsing to calculate"""
+"""Complexity analyzer that uses Tree-sitter AST parsing to calculate the
+cyclomatic complexity of each function and method in a source file."""
 from dataclasses import dataclass
 from typing import Optional
 
@@ -10,7 +11,7 @@ try:
     PY_LANGUAGE = Language(tspython.language())
     JAVA_LANGUAGE = Language(tsjava.language())
     TREE_SITTER_AVAILABLE = True
-except Exception as _e:
+except Exception:
     # Fallback: try older API style
     try:
         from tree_sitter import Language, Parser

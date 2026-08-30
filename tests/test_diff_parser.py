@@ -10,16 +10,18 @@ new file mode 100644
 +def hello():
 +    print("hello")
 +    return True
-"""files = parse_diff(diff)"""
+"""
     files = parse_diff(diff)
     assert len(files) == 1
-    assert files[0].is_new_file is False
-    assert files[0].old_path == "app.py"
-    assert files[0].new_path == "app.py"
+    assert files[0].is_new_file is True
+    assert files[0].old_path is None
+    assert files[0].new_path == "hello.py"
+    assert files[0].path == "hello.py"
+    assert files[0].language == "python"
     added = files[0].hunks[0].added_lines
     removed = files[0].hunks[0].removed_lines
-    assert len(added) == 2
-    assert len(removed) == 1
+    assert len(added) == 3
+    assert len(removed) == 0
 
 def test_parse_deleted_file():
     diff = """diff --git a/old.py b/old.py
@@ -29,11 +31,14 @@ deleted file mode 100644
 @@ -1,2 +0,0 @@
 -def old():
 -    pass
-"""files = parse_diff(diff)"""
+"""
     files = parse_diff(diff)
-    assert len(files) == 2
-    assert files[0].language == "python"
-    assert files[1].language == "java"
+    assert len(files) == 1
+    assert files[0].is_deleted_file is True
+    assert files[0].old_path == "old.py"
+    assert files[0].new_path is None
+    assert len(files[0].hunks[0].removed_lines) == 2
+    assert len(files[0].hunks[0].added_lines) == 0
 
 def test_language_detection():
     diff = """diff --git a/test.js b/test.js
@@ -41,9 +46,12 @@ def test_language_detection():
 +++ b/test.js
 @@ -0,0 +1 @@
 +console.log("hello");
-"""files = parse_diff(diff)"""
+"""
     files = parse_diff(diff)
-    assert files[0].all_added_content == "line1\nline2"
+    assert len(files) == 1
+    assert files[0].path == "test.js"
+    assert files[0].language == "javascript"
+    assert files[0].all_added_content == 'console.log("hello");'
 
 def test_is_unified_diff_true():
     diff = "diff --git a/f.py b/f.py\n--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-old\n+new"
@@ -115,4 +123,7 @@ new file mode 100644
 +from os import *
 +def ProcessData():
 +    eval("x")
-"""result = run_analysis(diff, enable_ml=False)"""
+"""
+    result = run_analysis(diff, enable_ml=False)
+    assert result.files_analyzed == 1
+    assert result.total_findings > 0

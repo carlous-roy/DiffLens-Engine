@@ -5,17 +5,19 @@ from alembic import context
 
 config = context.config
 
-# Override sqlalchemy.url from environment if available
-database_url = os.environ.get("DATABASE_URL")
-if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
+# Resolve the database URL: DATABASE_URL wins, otherwise fall back to the
+# application settings. alembic.ini deliberately leaves sqlalchemy.url blank.
+from app.config import get_settings
+
+database_url = os.environ.get("DATABASE_URL") or get_settings().database_url
+config.set_main_option("sqlalchemy.url", database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import all models so Alembic can detect them
 from app.db import Base
-from app.db.models import AnalysisRun, AnalysisFinding  # noqa: F401
+from app.db.models import AnalysisRun, AnalysisFinding, GitHubPR  # noqa: F401
 
 target_metadata = Base.metadata
 
