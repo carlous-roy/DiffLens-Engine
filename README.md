@@ -1,41 +1,66 @@
 # DiffLens
 
-**ML-powered code review intelligence.** Static analysis, risk scoring, auto-categorization, and GitHub integration — all in a containerized stack you can run locally in minutes.
+<p>
+  <a href="https://difflens.roycarlous.com"><img src="https://img.shields.io/badge/Live_demo-difflens.roycarlous.com-22C55E?style=flat-square" alt="Live demo" /></a>
+  <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=flat-square&logo=scikitlearn&logoColor=white" alt="scikit-learn" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker" />
+</p>
 
-**[Try the Live Demo](https://difflens.roycarlous.com)**
+A code review engine that parses the code rather than pattern-matching the text.
+
+Many review tools match patterns against source text. DiffLens parses Python and Java into
+**Tree-sitter ASTs** first, so "this function has a cyclomatic complexity of 19 and nests four deep"
+is a measurement rather than an estimate. On top of that sits a **gradient-boosting model** that scores
+overall change risk from diff size, severity distribution and complexity signals, **TF-IDF
+categorization** that sorts findings into security, correctness, performance, maintainability and
+style, and **embedding-based similarity search** that surfaces issues this codebase has already seen.
+
+An optional local **CodeLlama** pass rewrites findings as review comments, and GitHub webhooks run
+the analysis on every pull request: commit status, a summary comment with a findings table, and
+inline comments on the high-severity findings.
+
+The AST layer is what makes the findings usable. A regex can tell you the word `eval` appears; it
+cannot tell you whether that is inside a comment, a string literal, or a code path reachable from
+user input. The parse tree can. Every finding is anchored to a node, which is also how the inline PR
+comments land on the correct line.
+
+[Live demo](https://difflens.roycarlous.com) · [Portfolio](https://roycarlous.com)
 
 ---
 
 ## Features
 
 ### Static Analysis
-- **Cyclomatic Complexity** — Tree-sitter AST parsing detects overly complex functions and deep nesting in Python and Java code.
-- **Naming Conventions** — Validates PEP 8 (Python) and Java naming standards for classes, functions, variables, and constants.
-- **Bug Risk Detection** — Pattern matching identifies common anti-patterns: bare excepts, `eval()` usage, mutable default arguments, wildcard imports, hardcoded credentials, and more.
+- **Cyclomatic Complexity**: Tree-sitter AST parsing detects overly complex functions and deep nesting in Python and Java code.
+- **Naming Conventions**: validates PEP 8 (Python) and Java naming standards for classes, functions, variables, and constants.
+- **Bug Risk Detection**: pattern matching identifies common anti-patterns: bare excepts, `eval()` usage, mutable default arguments, wildcard imports, hardcoded credentials, and more.
 
 ### ML-Powered Intelligence
-- **Risk Scoring** — A scikit-learn gradient boosting model predicts overall change risk (low / medium / high) based on extracted features like diff size, severity distribution, and complexity.
-- **Auto-Categorization** — TF-IDF keyword matching classifies findings into security, correctness, performance, maintainability, and style.
-- **Similarity Search** — Lightweight embeddings find historically similar findings to surface recurring issues across your codebase.
-- **Smart Review** — Optional LLM-powered narrative review via Ollama / CodeLlama that produces human-quality review comments.
+- **Risk Scoring**: a scikit-learn gradient boosting model predicts overall change risk (low / medium / high) based on extracted features like diff size, severity distribution, and complexity.
+- **Auto-Categorization**: TF-IDF keyword matching classifies findings into security, correctness, performance, maintainability, and style.
+- **Similarity Search**: lightweight embeddings find historically similar findings to surface recurring issues across your codebase.
+- **Smart Review**: optional LLM-powered narrative review via Ollama / CodeLlama that produces human-quality review comments.
 
 ### GitHub Integration
-- **Webhook Listener** — Automatically analyzes pull requests when they are opened, synchronized, or reopened.
-- **Commit Statuses** — Sets pending/success/failure status on the PR head commit.
-- **Summary Comments** — Posts a detailed Markdown comment with findings table, risk score, severity breakdown, and category analysis.
-- **Inline Review Comments** — Adds code-level annotations on high-severity findings.
-- **Check Run Annotations** — Optional Checks API integration for inline annotations in the Files Changed tab.
-- **Manual Trigger** — Analyze any PR on demand via the dashboard or REST API.
+- **Webhook Listener**: automatically analyzes pull requests when they are opened, synchronized, or reopened.
+- **Commit Statuses**: sets pending/success/failure status on the PR head commit.
+- **Summary Comments**: posts a detailed Markdown comment with findings table, risk score, severity breakdown, and category analysis.
+- **Inline Review Comments**: adds code-level annotations on high-severity findings.
+- **Check Run Annotations**: optional Checks API integration for inline annotations in the Files Changed tab.
+- **Manual Trigger**: analyze any PR on demand via the dashboard or REST API.
 
 ### Dashboard
-- **Analyze Page** — Paste a unified diff or raw code for instant analysis with visualizations.
-- **GitHub Page** — View analyzed PRs, trigger manual analysis, see integration status.
-- **History Page** — Browse all past analysis runs with source filtering (API / GitHub).
-- **Run Detail Page** — Deep dive into findings grouped by file with severity breakdown.
-- **Status Page** — Real-time health checks for all services (DB, LLM, ML features).
+- **Analyze Page**: paste a unified diff or raw code for instant analysis with visualizations.
+- **GitHub Page**: view analyzed PRs, trigger manual analysis, see integration status.
+- **History Page**: browse all past analysis runs with source filtering (API / GitHub).
+- **Run Detail Page**: deep dive into findings grouped by file with severity breakdown.
+- **Status Page**: real-time health checks for all services (DB, LLM, ML features).
 
 ### Raw Code Auto-Detection
-Paste plain Python or Java code (not just diffs) — the engine auto-detects the language, wraps it into a synthetic diff, and runs the full analysis pipeline.
+Paste plain Python or Java code (not just diffs), the engine auto-detects the language, wraps it into a synthetic diff, and runs the full analysis pipeline.
 
 ---
 
@@ -76,7 +101,7 @@ cd DiffLens-Engine
 
 ```bash
 cp .env.example .env
-# Default values work for local development — no edits needed.
+# Default values work for local development. No edits needed.
 # To enable GitHub integration, add your token and webhook secret.
 ```
 
@@ -97,7 +122,7 @@ This starts four containers:
 
 ### 4. Open the dashboard
 
-Visit **http://localhost:3000** — paste code or load the sample diff and click Analyze.
+Visit **http://localhost:3000**, paste code or load the sample diff and click Analyze.
 
 ### 5. Verify everything is running
 
@@ -148,7 +173,7 @@ Go to your repo, then Settings, Webhooks, Add webhook:
 
 ### 6. Test it
 
-Open a pull request — DiffLens will automatically analyze it and post results.
+Open a pull request, DiffLens will automatically analyze it and post results.
 
 ---
 
@@ -230,8 +255,8 @@ All settings are controlled via environment variables. See `.env.example` for th
 | `ML_ENABLE_RISK_SCORING` | `true` | Enable risk score prediction |
 | `ML_ENABLE_SIMILARITY` | `true` | Enable similar finding search |
 | `ML_ENABLE_CATEGORIZATION` | `true` | Enable auto-categorization |
-| `GITHUB_TOKEN` | — | GitHub PAT for posting results |
-| `GITHUB_WEBHOOK_SECRET` | — | HMAC secret for webhook verification |
+| `GITHUB_TOKEN` |, | GitHub PAT for posting results |
+| `GITHUB_WEBHOOK_SECRET` |, | HMAC secret for webhook verification |
 | `GITHUB_POST_COMMENT` | `true` | Post summary comments on PRs |
 | `GITHUB_POST_REVIEW` | `true` | Post inline review comments |
 | `GITHUB_USE_CHECKS_API` | `false` | Use Checks API for annotations |
@@ -250,7 +275,7 @@ uvicorn app.main:app --reload --port 8000
 # Frontend
 cd frontend && npm install && npm run dev
 
-# Database — point DATABASE_URL to a local Postgres instance
+# Database: point DATABASE_URL to a local Postgres instance
 ```
 
 ### Running tests
@@ -275,10 +300,21 @@ Tests use SQLite in-memory and mock external services (GitHub API, Ollama).
 
 ---
 
+## What I'd do differently
+
+- **The risk model is trained on synthetic labels.** There is no corpus of "this PR caused an
+  incident", so risk is derived from the findings rather than from outcomes. The pipeline is honest
+  and the features are sensible, but calling the output a *prediction* would be overselling it. Real
+  labels would come from linking merged PRs to subsequent reverts or incident tickets.
+- **Two languages only.** Tree-sitter has grammars for dozens; the analysis rules are what is
+  Python- and Java-specific. Adding a language means writing its complexity and bug-risk rules, not
+  just dropping in a grammar.
+- **Similarity search is a flat scan.** Fine at this size, wrong past a few thousand findings. The
+  embeddings already exist, so this wants pgvector and an index rather than a rewrite.
+- **The LLM pass is unevaluated.** It produces comments that read well, and I have no measurement of
+  whether they are *correct* more often than they are fluent. That gap is exactly the one worth
+  closing next, and it needs a golden set with published numbers rather than a demo.
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
----
-
-Built by [Roy Carlous Christudass](https://roycarlous.com) | [Live Demo](https://difflens.roycarlous.com)
+MIT
