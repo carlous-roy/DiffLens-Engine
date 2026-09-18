@@ -28,13 +28,19 @@ class LLMResponse:
 class LLMProvider:
     """Unified LLM interface. Defaults to Ollama running locally."""
 
-    def __init__(self):
+    def __init__(self, transport: httpx.AsyncBaseTransport | None = None):
         settings = get_settings()
         self.provider = settings.llm_provider
-        self.base_url = settings.llm_base_url
+        self.base_url = settings.llm_base_url.rstrip("/")
         self.model = settings.llm_model
         self.api_key = settings.llm_api_key
         self.timeout = settings.llm_timeout
+        self._transport = transport  # tests inject an httpx.MockTransport
+
+    def _client(self, timeout: float | None = None) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            timeout=self.timeout if timeout is None else timeout, transport=self._transport
+        )
 
     async def generate(self, prompt: str, system_prompt: str | None = None) -> LLMResponse:
         """Generate a completion from the LLM."""
@@ -65,7 +71,7 @@ class LLMProvider:
             payload["system"] = system_prompt
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with self._client() as client:
                 resp = await client.post(url, json=payload)
                 resp.raise_for_status()
                 data = resp.json()
@@ -105,7 +111,7 @@ class LLMProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with self._client() as client:
                 resp = await client.post(url, json=payload, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()
@@ -151,7 +157,7 @@ class LLMProvider:
             if self.provider == "stub":
                 return True
             if self.provider == "ollama":
-                async with httpx.AsyncClient(timeout=5) as client:
+                async with self._client(timeout=5) as client:
                     resp = await client.get(f"{self.base_url}/api/tags")
                     return resp.status_code == 200
             return True
@@ -163,7 +169,7 @@ class LLMProvider:
         if self.provider != "ollama":
             return [self.model]
         try:
-            async with httpx.AsyncClient(timeout=5) as client:
+            async with self._client(timeout=5) as client:
                 resp = await client.get(f"{self.base_url}/api/tags")
                 data = resp.json()
                 return [m["name"] for m in data.get("models", [])]
