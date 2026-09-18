@@ -6,11 +6,16 @@ from sqlalchemy import engine_from_config, pool
 
 config = context.config
 
-# Resolve the database URL: DATABASE_URL wins, otherwise fall back to the
+# Resolve the database URL: a URL handed over programmatically wins (the app
+# passes it when migrating at startup), then DATABASE_URL, then the
 # application settings. alembic.ini deliberately leaves sqlalchemy.url blank.
 from app.config import get_settings
 
-database_url = os.environ.get("DATABASE_URL") or get_settings().database_url
+database_url = (
+    config.attributes.get("database_url")
+    or os.environ.get("DATABASE_URL")
+    or get_settings().database_url
+)
 config.set_main_option("sqlalchemy.url", database_url)
 
 # The CLI configures logging from alembic.ini; callers that already have

@@ -78,7 +78,7 @@ export default function AnalyzePage() {
             <p className="section-label">Analyze</p>
             <h2 className="font-extrabold text-3xl tracking-tight">Analyze Code</h2>
             <p className="text-sm text-[#9ca3af] mt-1.5">
-              Paste a unified diff or raw code to get instant quality feedback
+              Paste a unified diff or raw Python or Java code
             </p>
           </div>
           <button

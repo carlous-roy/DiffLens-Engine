@@ -14,6 +14,9 @@ os.environ["DIFFLENS_ENV_FILE"] = ""
 # The application engine points at an in-memory database so nothing on disk
 # is touched; routes get a per-test session through a dependency override.
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+# The schema comes from the per-test fixtures; startup migrations are tested
+# on their own in tests/test_migrations.py.
+os.environ["AUTO_MIGRATE"] = "false"
 # No model download during tests: the hashing backend is deterministic.
 os.environ["EMBEDDING_BACKEND"] = "hashing"
 

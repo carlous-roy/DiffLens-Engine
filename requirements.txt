@@ -1,30 +1,31 @@
-# Core
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.2
-pydantic-settings==2.1.0
+# Runtime dependencies. Development and CI tooling: requirements-dev.txt.
+
+# Web framework
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn[standard]==0.53.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-multipart==0.0.32
 
 # Database
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
-alembic==1.13.0
+sqlalchemy==2.0.54
+psycopg2-binary==2.9.13
+alembic==1.20.0
+pgvector==0.5.0
 
-# Static Analysis
-tree-sitter==0.23.2
-tree-sitter-python==0.23.6
+# Static analysis (Tree-sitter grammars)
+tree-sitter==0.25.2
+tree-sitter-python==0.25.0
 tree-sitter-java==0.23.5
 
-# ML - risk model (the committed artefact is tied to this scikit-learn version)
+# Risk model (the committed artefact is tied to this scikit-learn version)
 scikit-learn==1.9.1
 numpy==2.4.6
 joblib==1.6.0
 
-# ML - finding embeddings (ONNX, no PyTorch) and the pgvector column type
+# Finding embeddings (ONNX runtime, no PyTorch)
 fastembed==0.8.0
-pgvector==0.5.0
 
-# ML - Async HTTP for LLM calls
-httpx==0.25.2
-
-# Utilities
-python-multipart==0.0.6
+# HTTP client for GitHub and LLM providers
+httpx==0.28.1

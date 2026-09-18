@@ -40,7 +40,7 @@ function Logo() {
       <span className="font-semibold text-[17px] tracking-tight">
         Diff<span className="gradient-text">Lens</span>
       </span>
-      <span className="font-mono text-[10px] text-[#4b5563] ml-0.5">v1.0</span>
+      <span className="font-mono text-[10px] text-[#4b5563] ml-0.5">v1.1</span>
     </div>
   )
 }
@@ -74,7 +74,7 @@ export default function App() {
         {/* ─── Footer ─── */}
         <footer className="border-t border-border py-5">
           <div className="max-w-[1100px] mx-auto px-6 flex items-center justify-between text-xs text-[#4b5563]">
-            <span>DiffLens · ML-Powered Code Review</span>
+            <span>DiffLens · Static analysis and change-risk scoring</span>
             <span>GitHub Integration</span>
           </div>
         </footer>

@@ -1,42 +1,51 @@
+# Four services: PostgreSQL with pgvector, Ollama, the API and the dashboard.
+# Only the dashboard and the API are published, on localhost by default.
+# For live-reload development add the override: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
 services:
   db:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:0.8.6-pg17-bookworm
     container_name: difflens-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-difflens}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-difflens}
-    ports:
-      - "${DB_PORT:-5432}:5432"
+    expose:
+      - "5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-difflens}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-difflens} -d ${POSTGRES_DB:-difflens}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
 
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.18.3
     container_name: difflens-ollama
-    ports:
-      - "11434:11434"
+    expose:
+      - "11434"
     volumes:
       - ollama_data:/root/.ollama
     deploy:
       resources:
         limits:
           memory: 8G
+    restart: unless-stopped
 
   app:
     build:
       context: .
       dockerfile: Dockerfile
+    image: difflens-app
     container_name: difflens-app
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-difflens}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-difflens}
-      APP_ENV: ${APP_ENV:-development}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-difflens}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-difflens}
+      AUTO_MIGRATE: "true"
+      APP_ENV: ${APP_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      API_KEY: ${API_KEY:-}
       DASHBOARD_URL: ${DASHBOARD_URL:-http://localhost:3000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
@@ -47,7 +56,8 @@ services:
       ML_ENABLE_RISK_SCORING: ${ML_ENABLE_RISK_SCORING:-true}
       ML_ENABLE_SIMILARITY: ${ML_ENABLE_SIMILARITY:-true}
       ML_ENABLE_CATEGORIZATION: ${ML_ENABLE_CATEGORIZATION:-true}
-      # GitHub Integration
+      EMBEDDING_BACKEND: ${EMBEDDING_BACKEND:-fastembed}
+      # GitHub integration
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
       GITHUB_POST_COMMENT: ${GITHUB_POST_COMMENT:-true}
@@ -55,32 +65,26 @@ services:
       GITHUB_USE_CHECKS_API: ${GITHUB_USE_CHECKS_API:-false}
       GITHUB_ANALYZE_DRAFTS: ${GITHUB_ANALYZE_DRAFTS:-false}
       GITHUB_ENABLE_SMART_REVIEW: ${GITHUB_ENABLE_SMART_REVIEW:-false}
+      GITHUB_HISTORY_MAX_FILES: ${GITHUB_HISTORY_MAX_FILES:-20}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
     ports:
-      - "${APP_PORT:-8000}:8000"
-    volumes:
-      - ./app:/app/app
-      - ./tests:/app/tests
-      - ./alembic:/app/alembic
-      - ./alembic.ini:/app/alembic.ini
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
-    # Development path: the source directories above are bind-mounted, so
-    # --reload picks up local edits. The image's own CMD has no --reload.
-    command: >
-      sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    image: difflens-frontend
     container_name: difflens-frontend
     ports:
-      - "3000:3000"
+      - "${FRONTEND_BIND:-127.0.0.1}:${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - app
+    restart: unless-stopped
 
 volumes:
   pgdata:

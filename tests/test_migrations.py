@@ -59,3 +59,30 @@ def test_downgrade_to_base_removes_everything(database_url):
     command.downgrade(config, "base")
     inspector = inspect(create_engine(database_url))
     assert set(inspector.get_table_names()) <= {"alembic_version"}
+
+
+class TestStartupMigration:
+    def test_development_migrates_automatically(self, tmp_path):
+        from app.config import Settings
+        from app.db.migrate import migrate_on_startup, should_auto_migrate
+
+        url = f"sqlite:///{tmp_path / 'auto.db'}"
+        settings = Settings(database_url=url, app_env="development", auto_migrate=None)
+        assert should_auto_migrate(settings) is True
+        assert migrate_on_startup(settings) is True
+        tables = set(inspect(create_engine(url)).get_table_names())
+        assert "analysis_findings" in tables and "webhook_deliveries" in tables
+
+    def test_production_does_not_migrate_unless_asked(self, tmp_path):
+        from app.config import Settings
+        from app.db.migrate import migrate_on_startup, should_auto_migrate
+
+        url = f"sqlite:///{tmp_path / 'prod.db'}"
+        settings = Settings(database_url=url, app_env="production", auto_migrate=None)
+        assert should_auto_migrate(settings) is False
+        assert migrate_on_startup(settings) is False
+        assert inspect(create_engine(url)).get_table_names() == []
+
+        forced = Settings(database_url=url, app_env="production", auto_migrate=True)
+        assert migrate_on_startup(forced) is True
+        assert "analysis_runs" in inspect(create_engine(url)).get_table_names()

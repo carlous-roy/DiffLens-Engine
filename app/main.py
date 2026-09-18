@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.config import get_settings
+from app.db.migrate import migrate_on_startup
 from app.github.routes import github_router
 from app.logging_config import configure_logging
 from app.ml.risk_scoring import load_risk_model
@@ -20,7 +21,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Startup work: load the risk model artefact and the similarity corpus."""
+    """Startup work: migrations (in development), the risk model, the corpus."""
+    try:
+        migrate_on_startup(settings)
+    except Exception:
+        logger.exception("Database migrations failed; the API will not work until they run.")
     if load_risk_model() is None:
         logger.error("Risk scoring is running on the heuristic fallback.")
     get_finding_index().load_from_db()

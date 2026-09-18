@@ -1,8 +1,11 @@
 # Development and CI tooling. Runtime dependencies live in requirements.txt.
 -r requirements.txt
+
+# Tests and lint
 pytest==9.1.1
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
+httpx2==2.13.0  # HTTP client used by starlette's TestClient
 ruff==0.16.8
 
 # Training the risk model (scripts/train_risk_model.py)

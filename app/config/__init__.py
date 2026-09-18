@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Database. Defaults to a local SQLite file so the app runs from a clean
     # clone; docker-compose and any real deployment set DATABASE_URL to Postgres.
     database_url: str = "sqlite:///./difflens.db"
+    # Run `alembic upgrade head` at startup. Unset: yes in development, no
+    # elsewhere (production deployments run migrations as a release step).
+    auto_migrate: bool | None = None
 
     # App
     app_env: str = "development"

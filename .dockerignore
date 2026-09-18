@@ -1,0 +1,34 @@
+# Version control, environments and local state never belong in an image.
+.git
+.gitignore
+.github
+.env
+.env.*
+!.env.example
+.venv
+venv
+env
+*.db
+*.sqlite3
+data/
+htmlcov/
+.coverage
+.pytest_cache
+.ruff_cache
+.mypy_cache
+__pycache__/
+*.py[cod]
+*.log
+
+# Not needed at runtime.
+tests/
+docs/
+scripts/
+frontend/
+README.md
+CHANGELOG.md
+LICENSE
+pyproject.toml
+requirements-dev.txt
+docker-compose*.yml
+Dockerfile
