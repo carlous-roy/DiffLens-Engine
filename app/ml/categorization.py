@@ -74,7 +74,6 @@ CLASSIFICATION_RULES = [
         "performance",
         0.85,
         [
-            re.compile(r"complexity of \d{2,}", re.IGNORECASE),  # 2+ digit complexity
             re.compile(r"O\(n\^2\)|quadratic|exponential", re.IGNORECASE),
             re.compile(r"memory leak|resource leak", re.IGNORECASE),
             re.compile(r"unnecessary.*loop|redundant.*iteration", re.IGNORECASE),
@@ -88,6 +87,7 @@ CLASSIFICATION_RULES = [
         [
             re.compile(r"refactor", re.IGNORECASE),
             re.compile(r"cyclomatic complexity", re.IGNORECASE),
+            re.compile(r"nesting depth", re.IGNORECASE),
             re.compile(r"global.*keyword|global state", re.IGNORECASE),
             re.compile(r"wildcard import", re.IGNORECASE),
             re.compile(r"TODO|FIXME|HACK|XXX", re.IGNORECASE),

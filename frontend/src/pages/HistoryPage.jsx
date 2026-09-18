@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Clock, ChevronRight, AlertTriangle, FileCode, Loader2, Filter } from 'lucide-react'
 import { fetchRuns } from '../api'
+import { RiskBadge } from '../components/Badges'
 
 export default function HistoryPage() {
   const [runs, setRuns] = useState([])
@@ -80,6 +81,7 @@ export default function HistoryPage() {
                         ? 'bg-[rgba(29,78,216,0.08)] text-[#60a5fa] border-[rgba(29,78,216,0.15)]'
                         : 'bg-surface-raised text-[#4b5563] border-border'
                     }`}>{run.source}</span>
+                    {run.risk_level && <RiskBadge level={run.risk_level} />}
                     {critical > 0 && <span className="badge-critical"><AlertTriangle size={10} className="mr-1" />{critical} critical</span>}
                   </div>
                   <div className="flex items-center gap-4 mt-1 text-xs text-[#4b5563]">

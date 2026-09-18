@@ -44,7 +44,13 @@ class TestClassification:
         cat, conf, _ = _classify_single(
             "Function 'process' has cyclomatic complexity of 15.", "complexity", "error"
         )
-        assert cat == "performance"
+        assert cat == "maintainability"
+
+    def test_maintainability_nesting(self):
+        cat, _, _ = _classify_single(
+            "Function 'process' has a nesting depth of 5.", "complexity", "warning"
+        )
+        assert cat == "maintainability"
 
     def test_fallback_to_analyzer_default(self):
         cat, conf, _ = _classify_single(

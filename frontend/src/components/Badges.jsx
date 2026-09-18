@@ -23,8 +23,7 @@ export default function SeverityBadge({ severity }) {
 
 export function RiskBadge({ level }) {
   const key = (level || 'low').toLowerCase()
-  const cls = key === 'high' || key === 'critical'
-    ? 'badge-high' : key === 'medium' ? 'badge-medium' : 'badge-low'
+  const cls = key === 'high' ? 'badge-high' : key === 'medium' ? 'badge-medium' : 'badge-low'
   return <span className={cls}>{key.charAt(0).toUpperCase() + key.slice(1)} Risk</span>
 }
 
