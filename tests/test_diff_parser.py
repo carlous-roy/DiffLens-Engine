@@ -151,3 +151,61 @@ new file mode 100644
     result = run_analysis(diff, enable_ml=False)
     assert result.files_analyzed == 1
     assert result.total_findings > 0
+
+
+MODIFIED_FILE_DIFF = "\n".join(
+    [
+        "diff --git a/pkg/service.py b/pkg/service.py",
+        "--- a/pkg/service.py",
+        "+++ b/pkg/service.py",
+        "@@ -95,7 +100,12 @@ class Service:",
+        "     def existing(self):",
+        "         return 1",
+        " ",  # blank context line: a single space in a unified diff
+        "+    def route(self, x):",
+        "+        if x:",
+        "+            return eval(x)  # eval(y) in a comment",
+        '+        return "eval(z) in a string"',
+        "+",
+        "     def other(self):",
+        "         return 2",
+        "@@ -140,4 +150,4 @@ class Service:",
+        "     def last(self):",
+        "-        return old_value",
+        "+        return exec(new_value)",
+        "",
+    ]
+)
+
+
+def test_post_image_view_numbers_lines_by_new_file():
+    files = parse_diff(MODIFIED_FILE_DIFF)
+    view = files[0].post_image()
+    assert view.text.split("\n")[3] == "    def route(self, x):"
+    assert view.line_numbers[:9] == [100, 101, 102, 103, 104, 105, 106, 107, 108]
+    assert view.changed[:9] == [False, False, False, True, True, True, True, True, False]
+    # Second hunk: context line 150, added line 151 (the removed line is gone).
+    assert view.line_numbers[-2:] == [150, 151]
+    assert view.changed[-2:] == [False, True]
+    assert view.map_line(4) == 103
+    assert view.is_changed(4) is True
+    assert view.has_changes is True
+
+
+def test_pre_image_view_numbers_lines_by_old_file():
+    files = parse_diff(MODIFIED_FILE_DIFF)
+    view = files[0].pre_image()
+    assert view.line_numbers[-2:] == [140, 141]
+    assert view.changed[-2:] == [False, True]
+    assert view.text.split("\n")[-1] == "        return old_value"
+
+
+def test_source_view_from_text_is_identity():
+    from app.analysis.diff_parser import SourceView
+
+    view = SourceView.from_text("a\nb\nc")
+    assert view.line_numbers == [1, 2, 3]
+    assert view.changed == [True, True, True]
+    assert view.map_line(2) == 2
+    assert view.map_line(99) == 99  # out of range: returned unchanged
+    assert view.is_changed(99) is False

@@ -55,26 +55,26 @@ def run_analysis(diff_text: str, enable_ml: bool = True) -> AnalysisResult:
         if lang not in ("python", "java"):
             continue
 
-        added_content = fdiff.all_added_content
-        if not added_content.strip():
+        # The analyzers see the hunks as they read after the change (context
+        # plus added lines) and report only on added lines, with line numbers
+        # translated back to the new file through the hunk headers.
+        view = fdiff.post_image()
+        if not view.has_changes or not fdiff.all_added_content.strip():
             continue
 
-        # -- Complexity analysis (cyclomatic complexity via Tree-sitter) --
-        for cf in analyze_complexity(added_content, fdiff.path, lang):
+        # -- Complexity analysis (cyclomatic complexity and nesting depth) --
+        for cf in analyze_complexity(view.text, fdiff.path, lang, view):
             result.complexity_findings.append(asdict(cf))
             severity_counts[cf.severity] += 1
 
         # -- Naming convention checks (PEP 8 / Java style) --
         naming_fn = check_python_naming if lang == "python" else check_java_naming
-        for nf in naming_fn(added_content, fdiff.path):
+        for nf in naming_fn(view.text, fdiff.path, view):
             result.naming_findings.append(asdict(nf))
             severity_counts[nf.severity] += 1
 
-        # -- Bug risk pattern detection --
-        added_lines = []
-        for hunk in fdiff.hunks:
-            added_lines.extend(hunk.added_lines)
-        for bf in detect_bug_risks(added_lines, fdiff.path, lang):
+        # -- Bug risk rules over code (comments and strings masked) --
+        for bf in detect_bug_risks(view.text, fdiff.path, lang, view):
             result.bug_risk_findings.append(asdict(bf))
             severity_counts[bf.severity] += 1
 

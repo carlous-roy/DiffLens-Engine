@@ -91,3 +91,42 @@ def test_pipeline_unsupported_language():
     assert result.complexity_findings == []
     assert result.naming_findings == []
     assert result.bug_risk_findings == []
+
+
+def test_pipeline_reports_new_file_line_numbers_on_modified_files():
+    """Findings on a modified file point at real new-file lines (hunk header
+    `+100,12`), not at positions within the concatenated added text."""
+    from tests.test_diff_parser import MODIFIED_FILE_DIFF
+
+    result = run_analysis(MODIFIED_FILE_DIFF, enable_ml=False)
+
+    complexity = [(f["function_name"], f["line_number"]) for f in result.complexity_findings]
+    assert complexity == [("route", 103)]
+
+    bug_risks = [(f["rule_id"], f["line_number"]) for f in result.bug_risk_findings]
+    assert bug_risks == [("PY008", 105), ("PY008", 151)]
+
+
+def test_pipeline_ignores_eval_in_comments_and_strings():
+    diff = """diff --git a/a.py b/a.py
+new file mode 100644
+--- /dev/null
++++ b/a.py
+@@ -0,0 +1,4 @@
++# never call eval(x)
++message = "eval(x) is unsafe"
++doc = '''exec(y)'''
++value = 1
+"""
+    result = run_analysis(diff, enable_ml=False)
+    assert result.bug_risk_findings == []
+
+
+def test_pipeline_reports_nesting_depth():
+    from tests.conftest import SAMPLE_PYTHON_DIFF
+
+    result = run_analysis(SAMPLE_PYTHON_DIFF, enable_ml=False)
+    nesting = [f for f in result.complexity_findings if f["metric"] == "nesting_depth"]
+    assert [(f["function_name"], f["nesting_depth"], f["line_number"]) for f in nesting] == [
+        ("ProcessData", 4, 9)
+    ]

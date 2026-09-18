@@ -5,6 +5,44 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class SourceView:
+    """Text handed to an analyzer together with its origin in the diff.
+
+    `text` is what gets parsed. Line `i` (1-based) of `text` is line
+    `line_numbers[i-1]` of the file on the side of the diff the view was built
+    from, and `changed[i-1]` says whether that line was added (post-image) or
+    removed (pre-image). Analyzers report only on changed lines and translate
+    local line numbers through `line_numbers`, which is what makes inline PR
+    comments land on the right line of a modified file.
+    """
+
+    text: str
+    line_numbers: list[int]
+    changed: list[bool]
+
+    @classmethod
+    def from_text(cls, text: str) -> "SourceView":
+        """A view over standalone source: every line counts as changed."""
+        count = text.count("\n") + 1
+        return cls(text=text, line_numbers=list(range(1, count + 1)), changed=[True] * count)
+
+    def map_line(self, local_line: int) -> int:
+        """Translate a 1-based line of `text` to a file line number."""
+        if 1 <= local_line <= len(self.line_numbers):
+            return self.line_numbers[local_line - 1]
+        return local_line
+
+    def is_changed(self, local_line: int) -> bool:
+        if 1 <= local_line <= len(self.changed):
+            return self.changed[local_line - 1]
+        return False
+
+    @property
+    def has_changes(self) -> bool:
+        return any(self.changed)
+
+
+@dataclass
 class DiffHunk:
     """A single hunk (contiguous changed region) in a diff."""
 
@@ -87,6 +125,37 @@ class FileDiff:
             for _, content in hunk.added_lines:
                 lines.append(content)
         return "\n".join(lines)
+
+    def post_image(self) -> SourceView:
+        """Context plus added lines, numbered by the new file.
+
+        Removed lines are dropped, so the text is what the hunks look like
+        after the change. Context lines are included so that the parser sees
+        surrounding code (an enclosing class, an open docstring) rather than
+        a bag of disconnected added lines.
+        """
+        return self._view(side="new")
+
+    def pre_image(self) -> SourceView:
+        """Context plus removed lines, numbered by the old file."""
+        return self._view(side="old")
+
+    def _view(self, side: str) -> SourceView:
+        texts: list[str] = []
+        numbers: list[int] = []
+        changed: list[bool] = []
+        keep_prefix, drop_prefix = ("+", "-") if side == "new" else ("-", "+")
+        for hunk in self.hunks:
+            current = hunk.new_start if side == "new" else hunk.old_start
+            for line in hunk.lines:
+                if line.startswith(drop_prefix):
+                    continue
+                is_changed = line.startswith(keep_prefix)
+                texts.append(line[1:])
+                numbers.append(current)
+                changed.append(is_changed)
+                current += 1
+        return SourceView(text="\n".join(texts), line_numbers=numbers, changed=changed)
 
 
 # Diff parser
