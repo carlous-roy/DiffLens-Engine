@@ -1,7 +1,7 @@
 # DiffLens
 
 <p>
-  <a href="https://difflens.roycarlous.com"><img src="https://img.shields.io/badge/Live_demo-difflens.roycarlous.com-22C55E?style=flat-square" alt="Live demo" /></a>
+  <a href="https://difflens.roycarlous.com"><img src="https://img.shields.io/badge/Browser_demo-difflens.roycarlous.com-22C55E?style=flat-square" alt="Browser demo" /></a>
   <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" />
   <img src="https://img.shields.io/badge/scikit--learn-F7931E?style=flat-square&logo=scikitlearn&logoColor=white" alt="scikit-learn" />
@@ -9,58 +9,132 @@
   <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker" />
 </p>
 
-A code review engine that parses the code rather than pattern-matching the text.
+DiffLens reviews Python and Java diffs. It parses the changed code with
+Tree-sitter, measures cyclomatic complexity and nesting depth, runs naming and
+bug-risk rules that only match code (never comments or strings), scores the
+change with a gradient-boosting model trained on defect-inducing commits,
+finds related findings from earlier runs, and posts the result on GitHub pull
+requests as a commit status, a summary comment that is updated on each push,
+and inline review comments at the right lines.
 
-Many review tools match patterns against source text. DiffLens parses Python and Java into
-**Tree-sitter ASTs** first, so "this function has a cyclomatic complexity of 19" is a measurement
-rather than an estimate. On top of that sits a **weighted risk score** built from diff size, severity
-distribution and complexity signals, **keyword-rule categorization** that sorts findings into
-security, correctness, performance, maintainability and style, and **TF-IDF similarity search** that
-surfaces issues this codebase has already seen.
-
-An optional local **CodeLlama** pass rewrites findings as review comments, and GitHub webhooks run
-the analysis on every pull request: commit status, a summary comment with a findings table, and
-inline comments on the high-severity findings.
-
-The AST layer is what makes the findings usable. A regex can tell you the word `eval` appears; it
-cannot tell you whether that is inside a comment, a string literal, or a code path reachable from
-user input. The parse tree can. Every finding is anchored to a node, which is also how the inline PR
-comments land on the correct line.
-
-[Live demo](https://difflens.roycarlous.com) · [Portfolio](https://roycarlous.com)
+The browser demo at difflens.roycarlous.com is a separate JavaScript build of
+the rule engine; it does not run this service or its risk model.
 
 ---
 
-## Features
+## What it does
 
-### Static Analysis
-- **Cyclomatic Complexity**: Tree-sitter AST parsing detects overly complex functions and deep nesting in Python and Java code.
-- **Naming Conventions**: validates PEP 8 (Python) and Java naming standards for classes, functions, variables, and constants.
-- **Bug Risk Detection**: 15 rules (9 Python, 6 Java) identify common anti-patterns: bare excepts, `eval()` / `exec()` usage, mutable default arguments, wildcard imports, `global` state, `.equals(null)`, empty catch blocks, string comparison with `==`, and leftover TODO/FIXME markers.
+### Static analysis
 
-### Scoring and Classification
-- **Risk Scoring**: a weighted heuristic scores overall change risk (low / medium / high) over a 15-feature vector extracted from the diff and its findings: diff size, severity distribution, max and average complexity, churn ratio, naming violations, bug-risk density, and security-sensitive patterns. Every score ships with the contributing factors that produced it, so the number is explainable rather than opaque.
-- **Auto-Categorization**: regex keyword rules classify findings into security, correctness, performance, maintainability, and style, falling back to a per-analyzer default when no rule matches.
-- **Similarity Search**: TF-IDF vectors and cosine similarity find historically similar findings to surface recurring issues across your codebase. A sentence-transformers path is wired in and used automatically if that optional dependency is installed.
-- **Smart Review**: optional LLM-powered narrative review via Ollama / CodeLlama that rewrites findings as prose review comments.
+- **Parsing.** Each changed file is parsed with Tree-sitter (`tree-sitter-python`,
+  `tree-sitter-java`). The analyzers see the hunks as they read after the change
+  (context plus added lines) and report only on added lines. Line numbers are
+  mapped back to the new file through the hunk headers, so a finding on a
+  modified file points at the real line, which is what inline PR comments need.
+- **Cyclomatic complexity and nesting depth** per function or method, computed
+  from the syntax tree. Decision points (`if`, `elif`, loops, `except`, `case`,
+  boolean operators, comprehensions, ternaries; in Java also `&&`/`||` and
+  `case` groups) add to the complexity. Nesting depth counts nested control-flow
+  statements; an `else if` chain is one level. A depth of four or more is
+  reported as its own finding. A function is measured when its definition line
+  is part of the change.
+- **Bug-risk rules.** Nine Python and six Java rules (`eval()`/`exec()`, bare
+  `except`, silently swallowed exceptions, mutable default arguments,
+  `== None`, `global`, wildcard imports, `.equals(null)`, empty `catch`, string
+  comparison with `==`, `System.out`, manual threads, TODO markers). The rules
+  are line patterns, but they run over a masked copy of the source in which the
+  syntax tree's comment and string-content nodes are blanked out. `eval(` in a
+  comment or inside a string literal is not a finding; `eval(` inside an
+  f-string `{...}` is, because that is code. TODO rules run on comment nodes
+  only.
+- **Naming.** Class, function, method, field, parameter and variable names are
+  read from definition nodes: PEP 8 style for Python (snake_case functions,
+  variables and parameters, PascalCase classes, SCREAMING_SNAKE_CASE module
+  constants; CapWords type aliases are allowed) and Java style (PascalCase
+  types, camelCase methods, fields and locals, SCREAMING_SNAKE_CASE for
+  `static final`). Constructors are never mistaken for methods.
+- **Categories.** Keyword rules sort findings into security, correctness,
+  performance, maintainability and style, with a per-analyzer default.
 
-### GitHub Integration
-- **Webhook Listener**: automatically analyzes pull requests when they are opened, synchronized, or reopened.
-- **Commit Statuses**: sets pending/success/failure status on the PR head commit.
-- **Summary Comments**: posts a detailed Markdown comment with findings table, risk score, severity breakdown, and category analysis.
-- **Inline Review Comments**: adds code-level annotations on high-severity findings.
-- **Check Run Annotations**: optional Checks API integration for inline annotations in the Files Changed tab.
-- **Manual Trigger**: analyze any PR on demand via the dashboard or REST API.
+### Change-risk score
+
+`risk_score` in every response combines two things:
+
+1. A calibrated probability from a `HistGradientBoostingClassifier` trained on
+   ApacheJIT (Keshavarz and Nagappan, MSR 2022; 106,674 commits from 15 Apache
+   projects labelled as defect-inducing or clean, CC BY 4.0). Features are the
+   Kamei-style change metrics: lines added and deleted, files, directories and
+   subsystems touched, entropy of the change, and, when the GitHub flow can read
+   the base branch's history, the age of the changed files, their prior change
+   count and the author's prior commits. Two variants ship in one artefact:
+   one with the history features and a diff-only one for API submissions and
+   when history is unavailable. The output is isotonic-calibrated.
+2. The static findings, folded into a score with a noisy-OR over per-finding
+   severity weights (critical 0.30, error 0.12, warning 0.03, info 0).
+
+The final score is the noisy-OR of the two, `1 - (1 - p_model) * (1 - s_static)`,
+with levels low / medium / high at 0.3 and 0.6. Every response reports
+`model_type` (`gradient_boosting`), the model probability, the static score,
+the top per-feature attributions (change in probability when a feature is reset
+to its training median) and the formula. If the artefact is missing the service
+logs an error at startup and reports `model_type: heuristic`.
+
+Held-out results (newest 20% of every project's commits; test prevalence 20.0%;
+a constant prediction would score Brier 0.160):
+
+| Model | ROC-AUC | PR-AUC | Brier |
+|---|---|---|---|
+| full (diff + history features), calibrated | 0.800 | 0.468 | 0.134 |
+| diff only, calibrated | 0.782 | 0.442 | 0.139 |
+
+The training script, split, feature selection (including why `ndev` is
+measured but not used), attributions and limitations are in
+[docs/MODEL_CARD.md](docs/MODEL_CARD.md), which the script generates.
+
+### Related findings and clusters
+
+Each finding is embedded with `fastembed` (BAAI/bge-small-en-v1.5, ONNX, 384
+dimensions) and stored with the finding. Related past findings are the nearest
+neighbours by embedding (pgvector on PostgreSQL, numpy cosine on SQLite),
+re-scored with TF-IDF cosine similarity for lexical overlap, at most one per
+past run, reported when the combined score is at least 0.6. The corpus is
+clustered at startup with agglomerative clustering (average linkage, cosine
+distance, threshold 0.15, no k) and cluster ids are stored; a new finding joins
+the nearest cluster within the threshold or opens one. The API, the PR comment
+and the dashboard say how many times each finding was seen before. If
+`fastembed` cannot load its model the service falls back to a hashing backend
+(lexical only) and says so in `/api/v1/ml/status`.
+
+### Optional LLM pass
+
+With an Ollama (or OpenAI-compatible) endpoint configured, `/api/v1/smart-review`
+and `/api/v1/analyze` with `enable_smart_review` ask the model for issues the
+rules did not catch, with the static findings as context, and parse its JSON
+answer into comments. The pass is off for pull requests unless
+`GITHUB_ENABLE_SMART_REVIEW=true`. Model output is flattened to plain text
+before it is posted to GitHub. `LLM_PROVIDER=stub` returns canned answers so the
+path can be tested without a model; the quality of the real model's comments
+has not been measured.
+
+### GitHub integration
+
+- Webhook (`pull_request` opened, synchronize, reopened; drafts skipped by
+  default) with HMAC-SHA256 verification of the raw body and replay protection
+  through stored delivery ids (a repeated id is answered 409).
+- Commit status (pending, then success/failure by risk level), a summary comment
+  with a findings table that is updated in place on later pushes, and a review
+  with inline comments on error and critical findings. A high-risk review
+  requests changes unless the pull request author owns the token, in which case
+  it is posted as a comment (GitHub rejects the former).
+- Repository-history features for the risk model from the base branch's commit
+  history, bounded by `GITHUB_HISTORY_MAX_FILES`.
+- Manual trigger (`POST /api/v1/github/analyze-pr`) protected by `X-API-Key`.
 
 ### Dashboard
-- **Analyze Page**: paste a unified diff or raw code for instant analysis with visualizations.
-- **GitHub Page**: view analyzed PRs, trigger manual analysis, see integration status.
-- **History Page**: browse all past analysis runs with source filtering (API / GitHub).
-- **Run Detail Page**: deep dive into findings grouped by file with severity breakdown.
-- **Status Page**: real-time health checks for all services (DB, LLM, ML features).
 
-### Raw Code Auto-Detection
-Paste plain Python or Java code (not just diffs), the engine auto-detects the language, wraps it into a synthetic diff, and runs the full analysis pipeline.
+A React dashboard to paste a diff or raw code, see findings with categories and
+"seen before" badges, the risk gauge with the model's attributions, run history,
+analyzed pull requests, and service status.
 
 ---
 
@@ -68,257 +142,212 @@ Paste plain Python or Java code (not just diffs), the engine auto-detects the la
 
 ```
 ┌──────────────────┐     ┌──────────────────────────────────────────────┐
-│  React Dashboard │────>│  FastAPI Backend (:8000)                     │
-│  (:3000)         │     │                                              │
-└──────────────────┘     │  /api/v1/analyze        -> Analysis pipeline │
-                         │  /api/v1/github/webhook -> PR auto-analysis  │
-┌──────────────────┐     │  /api/v1/runs           -> History & details │
-│  GitHub          │────>│  /api/v1/github/status  -> Integration health│
-│  Webhooks        │     └──────────┬───────────────────────────────────┘
-└──────────────────┘                │
-                         ┌──────────▼──────────┐    ┌──────────────┐
-                         │  PostgreSQL (:5432)  │    │ Ollama (opt) │
-                         └─────────────────────┘    └──────────────┘
+│  React dashboard │────>│  FastAPI (:8000)                             │
+│  nginx (:3000)   │     │  /api/v1/analyze        static analysis,     │
+└──────────────────┘     │                         risk model, clusters │
+                         │  /api/v1/github/webhook PR flow              │
+┌──────────────────┐     │  /api/v1/runs           history              │
+│  GitHub webhooks │────>│                                              │
+└──────────────────┘     └──────────┬───────────────────────────────────┘
+                                    │
+                    ┌───────────────┴────────────┐    ┌──────────────┐
+                    │  PostgreSQL 17 + pgvector   │    │ Ollama (opt) │
+                    │  (SQLite without Docker)    │    └──────────────┘
+                    └────────────────────────────┘
 ```
+
+Analysis and persistence run in a worker thread pool, not on the event loop.
+The risk model artefact (0.8 MB, `app/ml/artifacts/`) and the embedding model
+load at startup.
 
 ---
 
-## Quick Start
+## Quick start
 
-### Prerequisites
-
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
-- (Optional) [Ollama](https://ollama.com) for LLM-powered smart reviews
-
-### 1. Clone the repository
+### With Docker Compose
 
 ```bash
 git clone https://github.com/carlous-roy/DiffLens-Engine.git
 cd DiffLens-Engine
-```
-
-### 2. Configure environment
-
-```bash
 cp .env.example .env
-# Default values work for local development. No edits needed.
-# To enable GitHub integration, add your token and webhook secret.
-```
-
-### 3. Start the stack
-
-```bash
+# set POSTGRES_PASSWORD (required) and API_KEY in .env
 docker compose up --build -d
 ```
 
-This starts four containers:
+Four containers start: `difflens-db` (pgvector/pgvector 0.8.6-pg17),
+`difflens-ollama` (ollama 0.18.3), `difflens-app` (FastAPI, port 8000) and
+`difflens-frontend` (nginx, port 3000). Only the API and the dashboard are
+published, on localhost. The app container runs the migrations at startup. The
+backend image downloads the embedding model at build time, so the first build
+needs network access.
 
-| Container | Port | Description |
-|-----------|------|-------------|
-| `difflens-app` | 8000 | FastAPI backend with Uvicorn |
-| `difflens-frontend` | 3000 | React dashboard served via Nginx |
-| `difflens-db` | 5432 | PostgreSQL 15 |
-| `difflens-ollama` | 11434 | Ollama LLM server (optional) |
+Open http://localhost:3000, load the sample and click Analyze. To pull the
+default LLM model: `docker compose exec ollama ollama pull codellama:7b`.
 
-### 4. Open the dashboard
-
-Visit **http://localhost:3000**, paste code or load the sample diff and click Analyze.
-
-### 5. Verify everything is running
+For live reload during development:
 
 ```bash
-docker compose ps
-docker compose logs app --tail 20
-curl http://localhost:8000/api/v1/health
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+### Without Docker
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+uvicorn app.main:app --reload --port 8000     # SQLite file, migrations run at startup
+cd frontend && npm ci && npm run dev          # dashboard on :3000, proxies /api to :8000
+```
+
+The first request embeds findings, which downloads the ONNX model (about
+65 MB, the quantized `qdrant/bge-small-en-v1.5-onnx-q` files) into the fastembed cache; set `EMBEDDING_BACKEND=hashing` to skip that.
+
+```bash
+curl -s http://localhost:8000/api/v1/health
+curl -s -X POST http://localhost:8000/api/v1/analyze \
+  -H 'Content-Type: application/json' \
+  -d '{"diff": "diff --git a/x.py b/x.py\n--- /dev/null\n+++ b/x.py\n@@ -0,0 +1,2 @@\n+def f(x):\n+    return eval(x)\n"}'
 ```
 
 ---
 
-## GitHub Webhook Setup
+## GitHub setup
 
-### 1. Generate a Personal Access Token
-
-Go to [github.com/settings/tokens?type=beta](https://github.com/settings/tokens?type=beta) and create a fine-grained token with:
-- Pull requests: Read and write
-- Commit statuses: Read and write
-- Contents: Read
-- Checks: Read and write (optional)
-
-### 2. Generate a webhook secret
-
-```bash
-python3 -c "import secrets; print(secrets.token_hex(32))"
-```
-
-### 3. Update `.env`
-
-```env
-GITHUB_TOKEN=REPLACE_WITH_YOUR_GITHUB_TOKEN
-GITHUB_WEBHOOK_SECRET=REPLACE_WITH_YOUR_WEBHOOK_SECRET
-```
-
-### 4. Expose DiffLens to the internet
-
-```bash
-ngrok http 8000
-```
-
-### 5. Configure the webhook on GitHub
-
-Go to your repo, then Settings, Webhooks, Add webhook:
-- Payload URL: `https://your-ngrok-url/api/v1/github/webhook`
-- Content type: `application/json`
-- Secret: paste your webhook secret
-- Events: select Pull requests only
-
-### 6. Test it
-
-Open a pull request, DiffLens will automatically analyze it and post results.
+1. Create a fine-grained personal access token with Pull requests: read and
+   write, Commit statuses: read and write, Contents: read (Checks: read and
+   write if you enable the Checks API).
+2. Generate a webhook secret and an API key:
+   `python3 -c "import secrets; print(secrets.token_hex(32))"`.
+3. Set `GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET` and `API_KEY` in `.env`. The
+   webhook endpoint rejects unsigned deliveries, and the manual trigger is
+   disabled until `API_KEY` is set.
+4. Expose the API (for example `ngrok http 8000`) and add a webhook on the
+   repository: payload URL `https://<public-url>/api/v1/github/webhook`, content
+   type `application/json`, the secret from step 2, event "Pull requests".
+5. Open a pull request. The commit status, summary comment and review appear
+   within a few seconds; later pushes update the same comment.
 
 ---
 
-## API Reference
+## API
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/analyze` | POST | Analyze a diff or raw code |
-| `/api/v1/smart-review` | POST | Standalone LLM code review |
-| `/api/v1/runs` | GET | List recent analysis runs |
-| `/api/v1/runs/{id}` | GET | Get run details with findings |
-| `/api/v1/health` | GET | Service health check |
-| `/api/v1/ml/status` | GET | ML feature availability |
-| `/api/v1/github/webhook` | POST | Receive GitHub webhook events |
-| `/api/v1/github/status` | GET | GitHub integration health |
-| `/api/v1/github/prs` | GET | List analyzed PRs |
-| `/api/v1/github/analyze-pr` | POST | Manually trigger PR analysis |
+| Endpoint | Method | Auth | Description |
+|---|---|---|---|
+| `/api/v1/analyze` | POST | key only with `enable_smart_review` | Analyze a diff or raw code (max 2 MB) |
+| `/api/v1/smart-review` | POST | `X-API-Key` | LLM review of a diff |
+| `/api/v1/runs` | GET | – | Recent runs (`limit` 1–200) |
+| `/api/v1/runs/{id}` | GET | – | Run with findings, categories, cluster ids and risk |
+| `/api/v1/health` | GET | – | Database, LLM and risk model status |
+| `/api/v1/ml/status` | GET | – | LLM, risk model, embeddings and index status |
+| `/api/v1/github/webhook` | POST | HMAC signature | GitHub deliveries |
+| `/api/v1/github/status` | GET | – | Integration configuration (token verified hourly) |
+| `/api/v1/github/prs` | GET | – | Analyzed pull requests |
+| `/api/v1/github/analyze-pr` | POST | `X-API-Key` | Analyze a pull request on demand |
 
-Interactive docs available at http://localhost:8000/docs (Swagger UI).
-
----
-
-## Project Structure
-
-```
-DiffLens-Engine/
-├── app/
-│   ├── analysis/              # Static analyzers
-│   │   ├── diff_parser.py         # Unified diff parser + raw code auto-detect
-│   │   ├── complexity.py          # Cyclomatic complexity via Tree-sitter
-│   │   ├── naming.py              # PEP 8 / Java naming conventions
-│   │   ├── bug_risk.py            # Bug risk pattern detection
-│   │   └── pipeline.py            # Orchestrates analyzers + ML modules
-│   ├── ml/                    # Machine learning modules
-│   │   ├── risk_scoring.py        # Weighted-heuristic risk scoring
-│   │   ├── categorization.py      # Keyword-rule finding categorization
-│   │   ├── similarity.py          # TF-IDF + cosine similarity search
-│   │   ├── smart_review.py        # LLM-powered narrative review
-│   │   └── llm_provider.py        # Pluggable LLM provider abstraction
-│   ├── github/                # GitHub integration
-│   │   ├── webhook.py             # HMAC signature verification + event dispatch
-│   │   ├── client.py              # Async GitHub REST API client
-│   │   ├── pr_analyzer.py         # Full PR analysis orchestration
-│   │   ├── formatter.py           # Markdown formatting for GitHub output
-│   │   └── routes.py              # Webhook endpoint + manual trigger
-│   ├── api/                   # Core REST API
-│   │   ├── routes.py              # /analyze, /runs, /health, /ml/status
-│   │   └── schemas.py             # Pydantic request/response models
-│   ├── db/                    # Database layer
-│   │   ├── models.py              # SQLAlchemy models (runs, findings, PRs)
-│   │   └── __init__.py            # Engine + session factory
-│   ├── config/                # Environment-based configuration
-│   └── main.py                # FastAPI app entrypoint
-├── frontend/                  # React dashboard
-│   └── src/
-│       ├── pages/                 # Analyze, GitHub, History, RunDetail, Status
-│       ├── components/            # Badges, Charts, RiskGauge, FindingsList
-│       ├── api.js                 # Backend API client
-│       └── index.css              # Tailwind + custom design system
-├── alembic/                   # Database migrations
-├── tests/                     # 14 test files covering all modules
-├── docker-compose.yml         # Full stack orchestration
-├── Dockerfile                 # Backend container
-├── .env.example               # Documented environment variables
-├── requirements.txt           # Python dependencies
-└── README.md
-```
+Interactive documentation: http://localhost:8000/docs.
 
 ---
 
 ## Configuration
 
-All settings are controlled via environment variables. See `.env.example` for the full list with descriptions.
+All settings are environment variables; `.env.example` documents every one.
+The most relevant:
 
 | Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `postgresql://...` | PostgreSQL connection string |
-| `ML_ENABLE_SMART_REVIEW` | `true` | Enable LLM-powered code review |
-| `ML_ENABLE_RISK_SCORING` | `true` | Enable risk score prediction |
-| `ML_ENABLE_SIMILARITY` | `true` | Enable similar finding search |
-| `ML_ENABLE_CATEGORIZATION` | `true` | Enable auto-categorization |
-| `DASHBOARD_URL` | `http://localhost:3000` | Frontend URL reported by the API root |
-| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated origins allowed to call the API |
-| `GITHUB_TOKEN` | _(unset)_ | GitHub PAT for posting results |
-| `GITHUB_WEBHOOK_SECRET` | _(unset)_ | HMAC secret for webhook verification. Required: the webhook endpoint rejects unsigned deliveries. |
-| `GITHUB_POST_COMMENT` | `true` | Post summary comments on PRs |
-| `GITHUB_POST_REVIEW` | `true` | Post inline review comments |
-| `GITHUB_USE_CHECKS_API` | `false` | Use Checks API for annotations |
+|---|---|---|
+| `DATABASE_URL` | `sqlite:///./difflens.db` | SQLAlchemy URL; compose sets PostgreSQL |
+| `AUTO_MIGRATE` | unset (on in development) | Run `alembic upgrade head` at startup |
+| `API_KEY` | unset | Required by the routes that spend the token or the LLM |
+| `MAX_DIFF_BYTES` | `2000000` | Largest diff accepted or fetched |
+| `EMBEDDING_BACKEND` | `fastembed` | `fastembed` or `hashing` |
+| `CLUSTER_DISTANCE_THRESHOLD` | `0.15` | Cosine distance that joins a cluster |
+| `SIMILARITY_MIN_SCORE` | `0.6` | Minimum combined score for a related finding |
+| `LLM_PROVIDER` | `ollama` | `ollama`, `openai` or `stub` |
+| `GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET` | unset | GitHub integration |
+| `GITHUB_HISTORY_MAX_FILES` | `20` | Files whose history feeds the risk model; 0 disables |
+| `GITHUB_ENABLE_SMART_REVIEW` | `false` | LLM pass on pull requests |
+| `LOG_LEVEL` | `INFO` | Process log level |
 
 ---
 
 ## Development
 
-### Running without Docker
-
 ```bash
-# Backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-
-# Frontend
-cd frontend && npm install && npm run dev
-
-# Database: point DATABASE_URL to a local Postgres instance
+pip install -r requirements-dev.txt
+pytest --cov=app                # 285 tests in 19 files, hermetic (no network, no .env)
+ruff check . && ruff format --check .
+python scripts/train_risk_model.py   # downloads ApacheJIT, retrains, rewrites docs/MODEL_CARD.md
 ```
 
-### Running tests
-
-```bash
-pytest -v
-```
-
-Tests use SQLite in-memory and mock external services (GitHub API, Ollama).
+The suite clears `GITHUB_TOKEN`/`GH_TOKEN`, ignores `.env`, uses an in-memory
+database, the hashing embedding backend and a fake GitHub API over
+`httpx.MockTransport`. GitHub Actions runs ruff, the tests with coverage, the
+frontend build and both Docker builds on every push.
 
 ---
 
-## Tech Stack
+## Known limitations
+
+- Only functions whose definition line is in the diff get a complexity
+  measurement, and the count covers the text visible in the diff. Edits inside
+  an existing function whose `def` is outside the hunk are not measured.
+- The rules are line patterns over masked source. A multi-line construct such
+  as an empty `catch` block spread over several lines is not matched.
+- The risk model was trained on Java-heavy Apache projects with commit-level
+  labels; its probabilities are not calibrated for other ecosystems, and a
+  pull request is scored as one change. ROC-AUC 0.80 ranks changes usefully
+  but is not a defect detector. See the model card.
+- The history features are computed from up to 20 files and one page of
+  commits per file; `aexp` is capped at 500.
+- Clusters of repeat findings are as good as the embeddings of short rule
+  messages; different functions with the same complexity message stay apart
+  only because their names differ.
+- The LLM pass is unevaluated: no measurement exists of how often its comments
+  are correct.
+- The PostgreSQL/pgvector path is exercised by compiling its query in the test
+  suite, not by running against a database in CI.
+- Two languages. Adding one means writing its rules, not only adding a grammar.
+
+---
+
+## Project structure
+
+```
+DiffLens-Engine/
+├── app/
+│   ├── analysis/          syntax.py (Tree-sitter, masking), complexity.py, naming.py,
+│   │                      bug_risk.py, diff_parser.py (hunk views), pipeline.py
+│   ├── ml/                risk_scoring.py, change_metrics.py, embeddings.py,
+│   │                      similarity.py (index, clustering), categorization.py,
+│   │                      smart_review.py, llm_provider.py, artifacts/ (model + metadata)
+│   ├── github/            webhook.py, client.py, history.py, pr_analyzer.py,
+│   │                      formatter.py, routes.py
+│   ├── api/               routes.py, schemas.py, auth.py
+│   ├── db/                models.py, persist.py, migrate.py
+│   ├── config/            settings
+│   ├── logging_config.py
+│   └── main.py
+├── alembic/               migrations 001–004
+├── scripts/train_risk_model.py
+├── docs/MODEL_CARD.md
+├── frontend/              React + Vite dashboard
+├── tests/                 pytest suite, fake GitHub API
+├── .github/workflows/ci.yml
+├── Dockerfile, docker-compose.yml, docker-compose.dev.yml
+└── requirements.txt, requirements-dev.txt
+```
+
+---
+
+## Tech stack
 
 | Layer | Technology |
-|-------|-----------|
-| Backend | FastAPI, SQLAlchemy, Alembic, Tree-sitter, scikit-learn |
-| Frontend | React 18, Vite, Tailwind CSS, Recharts, Lucide Icons |
-| Database | PostgreSQL 15 |
+|---|---|
+| Backend | FastAPI, SQLAlchemy, Alembic, Tree-sitter, scikit-learn, fastembed (ONNX) |
+| Frontend | React 18, Vite 7, Tailwind CSS, Recharts |
+| Database | PostgreSQL 17 with pgvector (SQLite without Docker) |
 | LLM | Ollama + CodeLlama 7B (optional) |
-| Infrastructure | Docker Compose, Nginx |
-
----
-
-## What I'd do differently
-
-- **Risk scoring is a weighted heuristic, not a learned model.** The weights are hand-tuned over the
-  extracted feature vector, because there is no corpus of "this PR caused an incident" to train
-  against. The feature extraction is built so a model can take over — `TrainedRiskModel` already
-  wraps the scikit-learn fit/predict path — but nothing is trained today, and calling the output a
-  *prediction* would be overselling it. Real labels would come from linking merged PRs to subsequent
-  reverts or incident tickets.
-- **Two languages only.** Tree-sitter has grammars for dozens; the analysis rules are what is
-  Python- and Java-specific. Adding a language means writing its complexity and bug-risk rules, not
-  just dropping in a grammar.
-- **Similarity search is a flat scan.** Every query re-scores the whole corpus. Fine at this size,
-  wrong past a few thousand findings. The fix is a vector index — pgvector, with real embeddings in
-  place of TF-IDF — rather than a rewrite of the search itself.
-- **The LLM pass is unevaluated.** It produces comments that read well, and I have no measurement of
-  whether they are *correct* more often than they are fluent. That gap is exactly the one worth
-  closing next, and it needs a golden set with published numbers rather than a demo.
+| Infrastructure | Docker Compose, nginx, GitHub Actions |
 
 ## License
 
