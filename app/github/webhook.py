@@ -45,8 +45,14 @@ def verify_webhook_signature(
     )
     computed = mac.hexdigest()
 
-    # Constant-time comparison to prevent timing attacks
-    return hmac.compare_digest(computed, expected_signature)
+    # Constant-time comparison to prevent timing attacks. A header with
+    # non-ASCII characters makes compare_digest raise; that is a bad
+    # signature, not a server error.
+    try:
+        return hmac.compare_digest(computed, expected_signature)
+    except TypeError:
+        logger.warning("Signature header is not a valid hex digest.")
+        return False
 
 
 SUPPORTED_EVENTS = {"pull_request", "ping"}
@@ -82,10 +88,10 @@ def should_analyze_event(event_type: str, payload: dict) -> bool:
 
 def extract_pr_info(payload: dict) -> dict:
     """Extract essential PR info from a webhook payload."""
-    pr = payload.get("pull_request", {})
-    repo = payload.get("repository", {})
+    pr = payload.get("pull_request") or {}
+    repo = payload.get("repository") or {}
 
-    owner_repo = repo.get("full_name", "").split("/")
+    owner_repo = (repo.get("full_name") or "").split("/")
     owner = owner_repo[0] if len(owner_repo) == 2 else ""
     repo_name = owner_repo[1] if len(owner_repo) == 2 else ""
 
@@ -93,14 +99,30 @@ def extract_pr_info(payload: dict) -> dict:
         "owner": owner,
         "repo": repo_name,
         "number": pr.get("number"),
-        "head_sha": pr.get("head", {}).get("sha", ""),
+        "head_sha": (pr.get("head") or {}).get("sha", ""),
         "title": pr.get("title", ""),
-        "author": pr.get("user", {}).get("login", ""),
-        "base_ref": pr.get("base", {}).get("ref", ""),
-        "head_ref": pr.get("head", {}).get("ref", ""),
+        "author": (pr.get("user") or {}).get("login", ""),
+        "base_ref": (pr.get("base") or {}).get("ref", ""),
+        "head_ref": (pr.get("head") or {}).get("ref", ""),
         "html_url": pr.get("html_url", ""),
+        "created_at": pr.get("created_at"),
         "additions": pr.get("additions", 0),
         "deletions": pr.get("deletions", 0),
         "changed_files": pr.get("changed_files", 0),
         "action": payload.get("action", ""),
     }
+
+
+def validate_pr_info(info: dict) -> str | None:
+    """Return a reason the payload cannot be acted on, or None when it is sound."""
+    from app.github.client import NAME_RE, SHA_RE
+
+    if not NAME_RE.match(info.get("owner") or ""):
+        return "repository owner is missing or invalid"
+    if not NAME_RE.match(info.get("repo") or ""):
+        return "repository name is missing or invalid"
+    if not isinstance(info.get("number"), int) or info["number"] < 1:
+        return "pull request number is missing or invalid"
+    if not SHA_RE.match(info.get("head_sha") or ""):
+        return "head sha is missing or invalid"
+    return None

@@ -1,10 +1,14 @@
 """Core REST API routes for DiffLens."""
 
-from fastapi import APIRouter, Depends, HTTPException
+import uuid
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.analysis.pipeline import run_analysis
+from app.api.auth import API_KEY_HEADER, check_api_key, require_api_key
 from app.api.schemas import (
     AnalyzeRequest,
     AnalyzeResponse,
@@ -57,6 +61,7 @@ async def health_check(db: Session = Depends(get_db)):
         version=settings.app_version,
         environment=settings.app_env,
         database=db_status,
+        database_backend=db.get_bind().dialect.name,
         llm=llm_status,
         ml_features=ml_features,
         risk_model=risk_model_status()["model_type"],
@@ -64,23 +69,30 @@ async def health_check(db: Session = Depends(get_db)):
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
-async def analyze_diff(request: AnalyzeRequest, db: Session = Depends(get_db)):
-    """Analyze a unified diff for code quality issues."""
+async def analyze_diff(
+    request: AnalyzeRequest,
+    db: Session = Depends(get_db),
+    x_api_key: str | None = Header(default=None, alias=API_KEY_HEADER),
+):
+    """Analyze a unified diff (or raw code) for code quality issues.
+
+    The optional LLM pass spends a model call, so it needs the API key.
+    """
+    if request.enable_smart_review:
+        check_api_key(x_api_key)
+
     try:
-        result = run_analysis(request.diff, enable_ml=request.enable_ml)
+        # Parsing and scoring are CPU-bound: keep them off the event loop.
+        result = await run_in_threadpool(run_analysis, request.diff, request.enable_ml)
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Analysis failed: {e}") from e
 
-    run = persist_run(db, result, source=request.source)
+    run = await run_in_threadpool(persist_run, db, result, request.source)
 
-    # Smart review (async, optional)
     review_result = None
     if request.enable_smart_review and settings.ml_enable_smart_review:
         try:
-            review_result = await smart_review(
-                request.diff,
-                static_findings=result.to_dict(),
-            )
+            review_result = await smart_review(request.diff, static_findings=result.to_dict())
             review_result = review_result.to_dict()
         except Exception as e:
             review_result = {"error": str(e), "llm_available": False}
@@ -98,9 +110,9 @@ async def analyze_diff(request: AnalyzeRequest, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/smart-review")
+@router.post("/smart-review", dependencies=[Depends(require_api_key)])
 async def standalone_smart_review(request: SmartReviewRequest):
-    """Standalone LLM-powered smart review endpoint."""
+    """Standalone LLM review of a diff. Requires the API key."""
     if not settings.ml_enable_smart_review:
         raise HTTPException(status_code=503, detail="Smart review is disabled.")
 
@@ -113,7 +125,7 @@ async def standalone_smart_review(request: SmartReviewRequest):
 
 @router.get("/ml/status")
 async def ml_status():
-    """Check the status of all ML features."""
+    """Status of the LLM provider, the risk model and the similarity index."""
     provider = get_llm_provider()
     llm_available = False
     llm_models = []
@@ -145,7 +157,7 @@ async def ml_status():
 
 
 @router.get("/runs")
-def list_runs(limit: int = 20, db: Session = Depends(get_db)):
+def list_runs(limit: int = Query(20, ge=1, le=200), db: Session = Depends(get_db)):
     """List recent analysis runs."""
     runs = db.query(AnalysisRun).order_by(AnalysisRun.created_at.desc()).limit(limit).all()
     return [
@@ -155,6 +167,7 @@ def list_runs(limit: int = 20, db: Session = Depends(get_db)):
             "source": r.source,
             "status": r.status,
             "summary": r.summary,
+            "risk_level": (r.risk or {}).get("level") if isinstance(r.risk, dict) else None,
         }
         for r in runs
     ]
@@ -163,7 +176,11 @@ def list_runs(limit: int = 20, db: Session = Depends(get_db)):
 @router.get("/runs/{run_id}")
 def get_run(run_id: str, db: Session = Depends(get_db)):
     """Get details of a specific analysis run including all findings."""
-    run = db.query(AnalysisRun).filter(AnalysisRun.id == run_id).first()
+    try:
+        run_uuid = uuid.UUID(run_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail="Run not found.") from e
+    run = db.query(AnalysisRun).filter(AnalysisRun.id == run_uuid).first()
     if not run:
         raise HTTPException(status_code=404, detail="Run not found.")
     return {

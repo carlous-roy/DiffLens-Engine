@@ -28,6 +28,7 @@ export default function GitHubPage() {
   const [error, setError] = useState(null)
   const [showTrigger, setShowTrigger] = useState(false)
   const [triggerForm, setTriggerForm] = useState({ owner: '', repo: '', number: '' })
+  const [apiKey, setApiKey] = useState(() => sessionStorage.getItem('difflens-api-key') || '')
   const [triggerLoading, setTriggerLoading] = useState(false)
   const [triggerResult, setTriggerResult] = useState(null)
 
@@ -49,7 +50,10 @@ export default function GitHubPage() {
     setTriggerLoading(true)
     setTriggerResult(null)
     try {
-      const result = await triggerPRAnalysis(triggerForm.owner, triggerForm.repo, parseInt(triggerForm.number))
+      sessionStorage.setItem('difflens-api-key', apiKey)
+      const result = await triggerPRAnalysis(
+        triggerForm.owner, triggerForm.repo, parseInt(triggerForm.number), apiKey,
+      )
       setTriggerResult({ success: true, message: result.message })
       setTimeout(loadData, 3000)
     } catch (err) { setTriggerResult({ success: false, message: err.message }) }
@@ -118,6 +122,17 @@ export default function GitHubPage() {
       {showTrigger && (
         <div className="card p-5" style={{ borderColor: 'rgba(220,38,38,0.15)' }}>
           <h3 className="text-sm font-medium text-[#DC2626] mb-3">Manually Analyze a PR</h3>
+          <p className="text-xs text-[#4b5563] mb-3">
+            Uses the server&apos;s GitHub token, so it needs the server&apos;s API key.
+          </p>
+          <div className="mb-3">
+            <label className="block text-xs text-[#4b5563] mb-1">API key</label>
+            <input type="password" value={apiKey} autoComplete="off"
+              onChange={e => setApiKey(e.target.value)}
+              placeholder="X-API-Key" required
+              className="w-full bg-surface-raised border border-border rounded-xl px-3 py-2
+                text-sm text-[#e4e4e7] placeholder-[#4b5563] font-sans" />
+          </div>
           <div className="flex items-end gap-3">
             {['owner', 'repo'].map(field => (
               <div key={field} className="flex-1">

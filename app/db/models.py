@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Column,
     DateTime,
     ForeignKey,
@@ -171,8 +172,21 @@ class GitHubPR(Base):
     head_sha = Column(String(40), nullable=False, index=True)
     action = Column(String(50), nullable=False, default="opened")
     pr_url = Column(String(500), nullable=True)
+    # Id of the summary comment on the PR, updated in place on later pushes.
+    comment_id = Column(BigInteger, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
     run = relationship("AnalysisRun", back_populates="github_pr")
 
     __table_args__ = (Index("ix_github_prs_owner_repo_number", "owner", "repo", "pr_number"),)
+
+
+class WebhookDelivery(Base):
+    """Every accepted webhook delivery, keyed by GitHub's delivery id, so a
+    captured delivery cannot be replayed."""
+
+    __tablename__ = "webhook_deliveries"
+
+    delivery_id = Column(String(100), primary_key=True)
+    event = Column(String(50), nullable=False)
+    received_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))

@@ -99,7 +99,7 @@ class TestFormatSummaryComment:
             "overall_summary": "Clean code.",
         }
         comment = format_summary_comment(analysis, smart_review=sr)
-        assert "AI Review" in comment
+        assert "LLM Review" in comment
         assert "Clean code." in comment
 
 

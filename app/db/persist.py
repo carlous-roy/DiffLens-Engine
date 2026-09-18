@@ -27,8 +27,8 @@ def persist_run(
 ) -> AnalysisRun:
     """Store the run and findings; register the findings in the similarity index.
 
-    `github` carries owner, repo, pr_number, head_sha and action when the run
-    came from a pull request.
+    `github` carries owner, repo, pr_number, head_sha, action and the id of
+    the summary comment when the run came from a pull request.
     """
     run = AnalysisRun(source=source, summary=result.summary, risk=result.risk_score)
     db.add(run)
@@ -45,6 +45,7 @@ def persist_run(
                 action=github.get("action", "opened"),
                 pr_url=f"https://github.com/{github['owner']}/{github['repo']}/pull/"
                 f"{github['pr_number']}",
+                comment_id=github.get("comment_id"),
             )
         )
 

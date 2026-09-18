@@ -20,7 +20,12 @@ if config.config_file_name is not None and config.attributes.get("configure_logg
 
 # Import all models so Alembic can detect them
 from app.db import Base
-from app.db.models import AnalysisFinding, AnalysisRun, GitHubPR  # noqa: F401
+from app.db.models import (  # noqa: F401
+    AnalysisFinding,
+    AnalysisRun,
+    GitHubPR,
+    WebhookDelivery,
+)
 
 target_metadata = Base.metadata
 

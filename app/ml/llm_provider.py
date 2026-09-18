@@ -1,5 +1,6 @@
 """Pluggable LLM provider abstraction."""
 
+import json
 import logging
 from dataclasses import dataclass
 
@@ -41,6 +42,8 @@ class LLMProvider:
             return await self._ollama_generate(prompt, system_prompt)
         elif self.provider == "openai":
             return await self._openai_generate(prompt, system_prompt)
+        elif self.provider == "stub":
+            return self._stub_generate(prompt)
         else:
             return LLMResponse(
                 content="", model=self.model, error=f"Unknown provider: {self.provider}"
@@ -117,9 +120,36 @@ class LLMProvider:
             logger.error("OpenAI-compatible API error: %s", str(e))
             return LLMResponse(content="", model=self.model, error=str(e))
 
+    def _stub_generate(self, prompt: str) -> LLMResponse:
+        """Canned review for tests and offline demos (LLM_PROVIDER=stub).
+
+        It answers in the JSON shape the real prompt asks for, echoing how
+        many static findings it was shown, so the whole review path can be
+        exercised without a model.
+        """
+        shown = prompt.count("\n- [")
+        content = json.dumps(
+            {
+                "comments": [
+                    {
+                        "file": "general",
+                        "line": None,
+                        "severity": "info",
+                        "category": "maintainability",
+                        "comment": f"Stub review: {shown} static findings were provided.",
+                        "suggestion": "Configure a real LLM provider for review comments.",
+                    }
+                ],
+                "overall_summary": "Stub provider response; no model was consulted.",
+            }
+        )
+        return LLMResponse(content=content, model="stub", tokens_used=0)
+
     async def is_available(self) -> bool:
         """Check if the LLM service is reachable."""
         try:
+            if self.provider == "stub":
+                return True
             if self.provider == "ollama":
                 async with httpx.AsyncClient(timeout=5) as client:
                     resp = await client.get(f"{self.base_url}/api/tags")

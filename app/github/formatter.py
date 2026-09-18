@@ -1,6 +1,11 @@
 """GitHub output formatter — converts DiffLens results into GitHub-friendly formats."""
 
+import re
+
 from app.analysis.pipeline import AnalysisResult
+
+# Hidden in the summary comment so a later run can find and update it.
+SUMMARY_MARKER = "<!-- difflens-summary -->"
 
 SEVERITY_EMOJI = {
     "critical": "🔴",
@@ -28,6 +33,7 @@ def format_summary_comment(
     risk_emoji = _risk_emoji(risk_level)
 
     lines = [
+        SUMMARY_MARKER,
         "## 🔍 DiffLens Code Review",
         "",
         "| Metric | Value |",
@@ -94,18 +100,18 @@ def format_summary_comment(
             lines.append(f"| {emoji} {sev} | {loc} | {msg} | {seen_before_label(f)} |")
         lines.append("")
 
-    # Smart review summary
+    # LLM review summary. Model output is untrusted text that came out of a
+    # prompt containing the diff, so it is flattened before it is posted.
     if smart_review and not smart_review.get("error"):
-        lines.append("### 🤖 AI Review")
+        lines.append("### 🤖 LLM Review")
         lines.append("")
         comments = smart_review.get("comments", [])
         if comments:
             for c in comments[:5]:
-                lines.append(
-                    f"- **{c.get('file', '')}:{c.get('line', '')}** — {c.get('comment', '')}"
-                )
+                location = plain_text(f"{c.get('file', '')}:{c.get('line', '')}", 120)
+                lines.append(f"- **{location}** — {plain_text(c.get('comment', ''), 500)}")
             lines.append("")
-        summary_text = smart_review.get("overall_summary", "")
+        summary_text = plain_text(smart_review.get("overall_summary", ""), 500)
         if summary_text:
             lines.append(f"> {summary_text}")
             lines.append("")
@@ -205,6 +211,18 @@ def findings_to_review_comments(analysis: AnalysisResult) -> list[dict]:
         )
 
     return comments
+
+
+_TAG_RE = re.compile(r"<[^>]*>")
+
+
+def plain_text(text: str, limit: int) -> str:
+    """Strip HTML tags, collapse whitespace and cap the length of model output."""
+    cleaned = _TAG_RE.sub("", str(text or ""))
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if len(cleaned) > limit:
+        cleaned = cleaned[: limit - 1].rstrip() + "…"
+    return cleaned
 
 
 def seen_before_label(finding: dict) -> str:

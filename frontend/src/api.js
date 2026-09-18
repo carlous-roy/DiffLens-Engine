@@ -56,11 +56,14 @@ export async function fetchGitHubPRs(limit = 20, repo = '') {
   return apiFetch(`${API_BASE}/github/prs?${params}`);
 }
 
-/** Manually trigger analysis of a specific PR. */
-export async function triggerPRAnalysis(owner, repo, number, token = '') {
+/**
+ * Manually trigger analysis of a specific PR. The route spends the server's
+ * GitHub token, so it requires the API key configured on the server.
+ */
+export async function triggerPRAnalysis(owner, repo, number, apiKey, token = '') {
   return apiFetch(`${API_BASE}/github/analyze-pr`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
     body: JSON.stringify({ owner, repo, number, token: token || undefined }),
   });
 }

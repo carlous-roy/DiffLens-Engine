@@ -76,9 +76,23 @@ export default function StatusPage() {
           <StatusCard icon={Server} title="Application" status={health?.status || 'unknown'}
             details={{ Version: health?.version || '—', Environment: health?.environment || '—' }} />
           <StatusCard icon={Database} title="Database" status={health?.database || 'unknown'}
-            details={{ Type: 'PostgreSQL 15', Status: health?.database || '—' }} />
+            details={{ Backend: health?.database_backend || '—', Status: health?.database || '—' }} />
           <StatusCard icon={Brain} title="LLM (Ollama)" status={health?.llm || 'disabled'}
             details={mlStatus?.llm ? { Provider: mlStatus.llm.provider, Model: mlStatus.llm.model, URL: mlStatus.llm.base_url, 'Models installed': mlStatus.llm.installed_models?.length || 0 } : undefined} />
+          <StatusCard icon={Cpu} title="Risk Model" status={mlStatus?.risk_model?.loaded ? 'active' : 'heuristic fallback'}
+            details={mlStatus?.risk_model ? {
+              Type: mlStatus.risk_model.model_type,
+              Version: mlStatus.risk_model.version || '—',
+              'ROC-AUC (full)': mlStatus.risk_model.variants?.full?.metrics?.roc_auc ?? '—',
+              'ROC-AUC (diff only)': mlStatus.risk_model.variants?.diff_only?.metrics?.roc_auc ?? '—',
+            } : undefined} />
+          <StatusCard icon={Cpu} title="Similarity" status={mlStatus?.similarity_index?.loaded_from_db ? 'active' : 'disabled'}
+            details={mlStatus?.similarity_index ? {
+              Embeddings: mlStatus.embeddings?.model || '—',
+              Search: mlStatus.similarity_index.search_backend,
+              Findings: mlStatus.similarity_index.findings,
+              Clusters: mlStatus.similarity_index.clusters,
+            } : undefined} />
           <StatusCard icon={Cpu} title="ML Features" status={Object.values(mlStatus?.features || {}).some(v => v) ? 'active' : 'disabled'}
             details={mlStatus?.features ? { 'Smart Review': mlStatus.features.smart_review ? '✓' : '✗', 'Risk Scoring': mlStatus.features.risk_scoring ? '✓' : '✗', Similarity: mlStatus.features.similarity ? '✓' : '✗', Categorization: mlStatus.features.categorization ? '✓' : '✗' } : undefined} />
         </div>

@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     app_name: str = "DiffLens"
     app_version: str = "1.1.0"
 
+    # Shared secret for the routes that spend the GitHub token or the LLM
+    # (POST /github/analyze-pr, POST /smart-review, /analyze with the LLM
+    # pass). Those routes answer 503 until it is set.
+    api_key: str | None = None
+    # Largest diff accepted from the API or fetched from GitHub, in bytes.
+    max_diff_bytes: int = 2_000_000
+
     # Frontend / browser clients
     dashboard_url: str = "http://localhost:3000"
     # Comma-separated list of origins allowed to call the API.
@@ -68,6 +75,9 @@ class Settings(BaseSettings):
     github_post_review: bool = True
     github_use_checks_api: bool = False
     github_enable_smart_review: bool = False
+    # Files (most changed first) for which commit history is fetched to
+    # compute the risk model's history features; 0 disables the lookups.
+    github_history_max_files: int = 20
     app_public_url: str | None = None
 
 

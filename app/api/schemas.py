@@ -2,11 +2,17 @@
 
 from pydantic import BaseModel, Field
 
+# Upper bound on a submitted diff; the setting MAX_DIFF_BYTES bounds fetched PR
+# diffs the same way. GitHub itself stops rendering diffs long before this.
+MAX_DIFF_CHARS = 2_000_000
+
 
 class AnalyzeRequest(BaseModel):
     """Request body for the /analyze endpoint."""
 
-    diff: str = Field(..., min_length=1, description="Unified diff text to analyze.")
+    diff: str = Field(
+        ..., min_length=1, max_length=MAX_DIFF_CHARS, description="Unified diff text to analyze."
+    )
     source: str = Field(default="api", description="Source of the diff (api, github, gitlab).")
     enable_ml: bool = Field(
         default=True, description="Run risk scoring, categorization and similarity search."
@@ -46,7 +52,9 @@ class AnalyzeResponse(BaseModel):
 class SmartReviewRequest(BaseModel):
     """Request for standalone smart review."""
 
-    diff: str = Field(..., min_length=1, description="Unified diff text to review.")
+    diff: str = Field(
+        ..., min_length=1, max_length=MAX_DIFF_CHARS, description="Unified diff text to review."
+    )
 
 
 class HealthResponse(BaseModel):
@@ -56,6 +64,7 @@ class HealthResponse(BaseModel):
     version: str
     environment: str
     database: str
+    database_backend: str | None = None
     llm: str | None = None
     ml_features: dict | None = None
     risk_model: str | None = None
