@@ -1,13 +1,29 @@
 """DiffLens FastAPI entrypoint."""
 
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.config import get_settings
 from app.github.routes import github_router
+from app.logging_config import configure_logging
+from app.ml.risk_scoring import load_risk_model
 
 settings = get_settings()
+configure_logging(settings.log_level)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Startup work: load the risk model artefact (loudly reports a fallback)."""
+    if load_risk_model() is None:
+        logger.error("Risk scoring is running on the heuristic fallback.")
+    yield
+
 
 app = FastAPI(
     title=settings.app_name,
@@ -16,6 +32,7 @@ app = FastAPI(
         "Code review for Python and Java diffs: Tree-sitter static analysis, "
         "change-risk scoring and GitHub pull request integration."
     ),
+    lifespan=lifespan,
 )
 
 allowed_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]

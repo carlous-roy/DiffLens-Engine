@@ -1,6 +1,6 @@
 """Pydantic request/response models for the DiffLens API."""
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 class AnalyzeRequest(BaseModel):
@@ -17,17 +17,6 @@ class AnalyzeRequest(BaseModel):
     )
 
 
-class FindingResponse(BaseModel):
-    """Single finding in the analysis response."""
-
-    analyzer: str
-    file_path: str
-    line_number: int | None = None
-    severity: str
-    message: str
-    suggestion: str | None = None
-
-
 class SummaryResponse(BaseModel):
     """Summary statistics for an analysis run."""
 
@@ -35,18 +24,6 @@ class SummaryResponse(BaseModel):
     total_findings: int
     by_severity: dict
     by_analyzer: dict
-
-
-class RiskScoreResponse(BaseModel):
-    """Risk assessment for a code change."""
-
-    model_config = ConfigDict(protected_namespaces=())
-
-    level: str
-    score: float
-    confidence: float
-    contributing_factors: list[str]
-    model_type: str
 
 
 class AnalyzeResponse(BaseModel):
@@ -79,3 +56,4 @@ class HealthResponse(BaseModel):
     database: str
     llm: str | None = None
     ml_features: dict | None = None
+    risk_model: str | None = None

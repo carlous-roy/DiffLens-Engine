@@ -86,3 +86,22 @@ def test_get_run_detail(client):
 def test_get_run_not_found(client):
     response = client.get("/api/v1/runs/00000000-0000-0000-0000-000000000000")
     assert response.status_code == 404
+
+
+def test_analyze_reports_gradient_boosting_risk_with_attributions(client):
+    response = client.post("/api/v1/analyze", json={"diff": SAMPLE_PYTHON_DIFF})
+    assert response.status_code == 200
+    risk = response.json()["risk_score"]
+    assert risk["model_type"] == "gradient_boosting"
+    assert risk["level"] in ("low", "medium", "high")
+    assert 0.0 <= risk["model_probability"] <= 1.0
+    assert risk["attributions"], "each prediction exposes its top attributions"
+    assert {"feature", "value", "contribution"} <= set(risk["attributions"][0])
+    assert risk["combination"]["method"] == "noisy_or"
+
+
+def test_health_and_ml_status_report_the_risk_model(client):
+    assert client.get("/api/v1/health").json()["risk_model"] == "gradient_boosting"
+    status = client.get("/api/v1/ml/status").json()
+    assert status["risk_model"]["loaded"] is True
+    assert "base_url" not in status["llm"]

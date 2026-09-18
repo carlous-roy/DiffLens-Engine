@@ -4,3 +4,7 @@ pytest==9.1.1
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 ruff==0.16.8
+
+# Training the risk model (scripts/train_risk_model.py)
+pandas==3.0.6
+shap==0.51.0

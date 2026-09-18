@@ -6,7 +6,9 @@ from app.analysis.bug_risk import detect_bug_risks
 from app.analysis.complexity import analyze_complexity
 from app.analysis.diff_parser import is_unified_diff, parse_diff, wrap_raw_code
 from app.analysis.naming import check_java_naming, check_python_naming
+from app.config import get_settings
 from app.ml.categorization import categorize_findings
+from app.ml.change_metrics import AuthorHistory
 from app.ml.risk_scoring import score_risk
 from app.ml.similarity import get_embedder
 
@@ -39,8 +41,17 @@ class AnalysisResult:
         }
 
 
-def run_analysis(diff_text: str, enable_ml: bool = True) -> AnalysisResult:
-    """Run the full analysis pipeline."""
+def run_analysis(
+    diff_text: str,
+    enable_ml: bool = True,
+    history: AuthorHistory | None = None,
+) -> AnalysisResult:
+    """Run the full analysis pipeline.
+
+    `history` carries repository-history metrics for the change when the
+    caller (the GitHub flow) could measure them; the risk model uses its
+    diff-only variant otherwise.
+    """
     # If the user pasted raw code instead of a diff, wrap it automatically.
     # This way the Analyze page works for both use cases.
     if diff_text.strip() and not is_unified_diff(diff_text):
@@ -90,33 +101,40 @@ def run_analysis(diff_text: str, enable_ml: bool = True) -> AnalysisResult:
         },
     }
 
-    # -- ML-powered modules (risk scoring, categorization, similarity) --
+    # -- Risk scoring, categorization, similarity --
     if enable_ml:
-        _run_ml_modules(result, file_diffs)
+        _run_ml_modules(result, file_diffs, history)
 
     return result
 
 
-def _run_ml_modules(result: AnalysisResult, file_diffs) -> None:
-    """Run ML modules and attach results. Each is wrapped in try/except
-    so a failure in one doesn't block the others."""
+def _run_ml_modules(result: AnalysisResult, file_diffs, history: AuthorHistory | None) -> None:
+    """Run the scoring modules that are enabled in settings and attach their
+    results. Each is wrapped in try/except so a failure in one does not block
+    the others."""
+    settings = get_settings()
     all_flat = _flatten_findings(result)
 
-    # Risk scoring — weighted heuristic over extracted diff/finding features
-    try:
-        risk = score_risk(result.to_dict(), file_diffs)
-        result.risk_score = risk.to_dict()
-    except Exception as e:
-        result.risk_score = {"error": str(e)}
+    # Risk scoring: calibrated model probability combined with the findings
+    if settings.ml_enable_risk_scoring:
+        try:
+            risk = score_risk(result.to_dict(), file_diffs, history=history)
+            result.risk_score = risk.to_dict()
+        except Exception as e:
+            result.risk_score = {"error": str(e)}
 
-    # Auto-categorization — keyword rules assign security/correctness/etc.
-    try:
-        cat_result = categorize_findings(all_flat)
-        result.categorization = cat_result.to_dict()
-    except Exception as e:
-        result.categorization = {"error": str(e)}
+    # Categorization: keyword rules assign security/correctness/etc.
+    if settings.ml_enable_categorization:
+        try:
+            cat_result = categorize_findings(all_flat)
+            result.categorization = cat_result.to_dict()
+        except Exception as e:
+            result.categorization = {"error": str(e)}
 
-    # Similarity search — find historically similar findings
+    if not settings.ml_enable_similarity:
+        return
+
+    # Similarity search: related past findings
     try:
         embedder = get_embedder()
         similar_results = []

@@ -44,3 +44,6 @@ htmlcov/
 # Database
 *.db
 *.sqlite3
+
+# Training data cache (downloaded by scripts/train_risk_model.py)
+data/

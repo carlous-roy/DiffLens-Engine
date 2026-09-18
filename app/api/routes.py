@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.db.models import AnalysisFinding, AnalysisRun, SeverityLevel
 from app.ml.llm_provider import get_llm_provider
+from app.ml.risk_scoring import risk_model_status
 from app.ml.smart_review import smart_review
 
 router = APIRouter()
@@ -55,6 +56,7 @@ async def health_check(db: Session = Depends(get_db)):
         database=db_status,
         llm=llm_status,
         ml_features=ml_features,
+        risk_model=risk_model_status()["model_type"],
     )
 
 
@@ -176,10 +178,10 @@ async def ml_status():
         "llm": {
             "provider": provider.provider,
             "model": provider.model,
-            "base_url": provider.base_url,
             "available": llm_available,
             "installed_models": llm_models,
         },
+        "risk_model": risk_model_status(),
         "features": {
             "smart_review": settings.ml_enable_smart_review,
             "risk_scoring": settings.ml_enable_risk_scoring,

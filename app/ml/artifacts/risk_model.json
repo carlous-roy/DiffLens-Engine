@@ -1,0 +1,532 @@
+{
+  "version": "apachejit-hgb-20260918",
+  "trained_at": "2026-09-18 12:22 UTC",
+  "seed": 42,
+  "dataset": {
+    "name": "ApacheJIT",
+    "citation": "Hossein Keshavarz and Meiyappan Nagappan. ApacheJIT: A Large Dataset for Just-In-Time Defect Prediction. MSR 2022 (Data Showcase).",
+    "url": "https://doi.org/10.5281/zenodo.5907847",
+    "download_url": "https://zenodo.org/api/records/5907847/files/apachejit_dataset_replication.zip/content",
+    "archive_md5": "528bf0ee04b15976be6bf15f8efddc65",
+    "member": "apachejit/dataset/apachejit_total.csv",
+    "license": "CC BY 4.0",
+    "n_commits": 106674,
+    "n_projects": 15,
+    "projects": [
+      "apache/activemq",
+      "apache/camel",
+      "apache/cassandra",
+      "apache/flink",
+      "apache/groovy",
+      "apache/hadoop",
+      "apache/hadoop-hdfs",
+      "apache/hadoop-mapreduce",
+      "apache/hbase",
+      "apache/hive",
+      "apache/ignite",
+      "apache/kafka",
+      "apache/spark",
+      "apache/zeppelin",
+      "apache/zookeeper"
+    ],
+    "years": [
+      2003,
+      2019
+    ],
+    "prevalence": 0.2647,
+    "n_fit": 72538,
+    "n_calibration": 12802,
+    "n_test": 21334,
+    "test_prevalence": 0.2002,
+    "baseline_brier_prevalence": 0.1601
+  },
+  "feature_selection": [
+    {
+      "features": "diff only",
+      "roc_auc": 0.7874,
+      "pr_auc": 0.4628
+    },
+    {
+      "features": "diff + ndev",
+      "roc_auc": 0.7711,
+      "pr_auc": 0.4355
+    },
+    {
+      "features": "diff + age",
+      "roc_auc": 0.7948,
+      "pr_auc": 0.4753
+    },
+    {
+      "features": "diff + nuc",
+      "roc_auc": 0.7969,
+      "pr_auc": 0.4765
+    },
+    {
+      "features": "diff + aexp",
+      "roc_auc": 0.7976,
+      "pr_auc": 0.4708
+    },
+    {
+      "features": "diff + age + nuc + aexp (shipped full model)",
+      "roc_auc": 0.8093,
+      "pr_auc": 0.4956
+    },
+    {
+      "features": "diff + all four history features",
+      "roc_auc": 0.7884,
+      "pr_auc": 0.4584
+    }
+  ],
+  "models": {
+    "full": {
+      "feature_names": [
+        "la",
+        "ld",
+        "nf",
+        "nd",
+        "ns",
+        "ent",
+        "age",
+        "nuc",
+        "aexp"
+      ],
+      "params": {
+        "learning_rate": 0.03,
+        "max_iter": 600,
+        "max_leaf_nodes": 15,
+        "min_samples_leaf": 50
+      },
+      "trials": [
+        {
+          "learning_rate": 0.05,
+          "max_iter": 300,
+          "max_leaf_nodes": 31,
+          "min_samples_leaf": 50,
+          "calibration_roc_auc": 0.779
+        },
+        {
+          "learning_rate": 0.05,
+          "max_iter": 500,
+          "max_leaf_nodes": 31,
+          "min_samples_leaf": 100,
+          "calibration_roc_auc": 0.7776
+        },
+        {
+          "learning_rate": 0.1,
+          "max_iter": 200,
+          "max_leaf_nodes": 31,
+          "min_samples_leaf": 50,
+          "calibration_roc_auc": 0.7769
+        },
+        {
+          "learning_rate": 0.1,
+          "max_iter": 300,
+          "max_leaf_nodes": 63,
+          "min_samples_leaf": 100,
+          "calibration_roc_auc": 0.7671
+        },
+        {
+          "learning_rate": 0.03,
+          "max_iter": 600,
+          "max_leaf_nodes": 15,
+          "min_samples_leaf": 50,
+          "calibration_roc_auc": 0.7823
+        }
+      ],
+      "baseline": {
+        "la": 37.0,
+        "ld": 8.0,
+        "nf": 3.0,
+        "nd": 2.0,
+        "ns": 1.0,
+        "ent": 1.0,
+        "age": 10.5,
+        "nuc": 15.0,
+        "aexp": 266.0
+      },
+      "evaluation": {
+        "raw": {
+          "roc_auc": 0.8002,
+          "pr_auc": 0.48,
+          "brier": 0.1414
+        },
+        "calibrated": {
+          "roc_auc": 0.8,
+          "pr_auc": 0.468,
+          "brier": 0.1343
+        },
+        "per_project": [
+          {
+            "project": "apache/activemq",
+            "n": 1225,
+            "prevalence": 0.171,
+            "roc_auc": 0.7662,
+            "pr_auc": 0.4468
+          },
+          {
+            "project": "apache/camel",
+            "n": 4540,
+            "prevalence": 0.035,
+            "roc_auc": 0.769,
+            "pr_auc": 0.1071
+          },
+          {
+            "project": "apache/cassandra",
+            "n": 1632,
+            "prevalence": 0.357,
+            "roc_auc": 0.8106,
+            "pr_auc": 0.6599
+          },
+          {
+            "project": "apache/flink",
+            "n": 2338,
+            "prevalence": 0.162,
+            "roc_auc": 0.791,
+            "pr_auc": 0.3887
+          },
+          {
+            "project": "apache/groovy",
+            "n": 1612,
+            "prevalence": 0.092,
+            "roc_auc": 0.755,
+            "pr_auc": 0.2169
+          },
+          {
+            "project": "apache/hadoop-hdfs",
+            "n": 581,
+            "prevalence": 0.788,
+            "roc_auc": 0.937,
+            "pr_auc": 0.9807
+          },
+          {
+            "project": "apache/hadoop-mapreduce",
+            "n": 264,
+            "prevalence": 0.777,
+            "roc_auc": 0.9075,
+            "pr_auc": 0.9685
+          },
+          {
+            "project": "apache/hbase",
+            "n": 1746,
+            "prevalence": 0.254,
+            "roc_auc": 0.7613,
+            "pr_auc": 0.4784
+          },
+          {
+            "project": "apache/hive",
+            "n": 1368,
+            "prevalence": 0.379,
+            "roc_auc": 0.7997,
+            "pr_auc": 0.6708
+          },
+          {
+            "project": "apache/ignite",
+            "n": 2407,
+            "prevalence": 0.377,
+            "roc_auc": 0.8376,
+            "pr_auc": 0.7177
+          },
+          {
+            "project": "apache/kafka",
+            "n": 477,
+            "prevalence": 0.203,
+            "roc_auc": 0.794,
+            "pr_auc": 0.5018
+          },
+          {
+            "project": "apache/spark",
+            "n": 293,
+            "prevalence": 0.208,
+            "roc_auc": 0.8349,
+            "pr_auc": 0.4981
+          },
+          {
+            "project": "apache/zeppelin",
+            "n": 290,
+            "prevalence": 0.31,
+            "roc_auc": 0.7089,
+            "pr_auc": 0.5169
+          },
+          {
+            "project": "apache/zookeeper",
+            "n": 168,
+            "prevalence": 0.083,
+            "roc_auc": 0.7904,
+            "pr_auc": 0.2075
+          }
+        ]
+      },
+      "attributions": {
+        "permutation_importance_roc_auc": {
+          "la": {
+            "mean": 0.2205,
+            "std": 0.0017
+          },
+          "ld": {
+            "mean": 0.0175,
+            "std": 0.0003
+          },
+          "nf": {
+            "mean": 0.0076,
+            "std": 0.0003
+          },
+          "nd": {
+            "mean": 0.0012,
+            "std": 0.0004
+          },
+          "ns": {
+            "mean": 0.0166,
+            "std": 0.0003
+          },
+          "ent": {
+            "mean": 0.0048,
+            "std": 0.0004
+          },
+          "age": {
+            "mean": 0.0149,
+            "std": 0.0015
+          },
+          "nuc": {
+            "mean": 0.0091,
+            "std": 0.0016
+          },
+          "aexp": {
+            "mean": 0.0209,
+            "std": 0.0013
+          }
+        },
+        "mean_abs_shap_log_odds": {
+          "la": 1.0749,
+          "ld": 0.1364,
+          "nf": 0.0484,
+          "nd": 0.0803,
+          "ns": 0.2289,
+          "ent": 0.0496,
+          "age": 0.2044,
+          "nuc": 0.1875,
+          "aexp": 0.1584
+        },
+        "shap_version": "0.51.0",
+        "shap_sample_size": 5000
+      }
+    },
+    "diff_only": {
+      "feature_names": [
+        "la",
+        "ld",
+        "nf",
+        "nd",
+        "ns",
+        "ent"
+      ],
+      "params": {
+        "learning_rate": 0.05,
+        "max_iter": 300,
+        "max_leaf_nodes": 31,
+        "min_samples_leaf": 50
+      },
+      "trials": [
+        {
+          "learning_rate": 0.05,
+          "max_iter": 300,
+          "max_leaf_nodes": 31,
+          "min_samples_leaf": 50,
+          "calibration_roc_auc": 0.7721
+        },
+        {
+          "learning_rate": 0.05,
+          "max_iter": 500,
+          "max_leaf_nodes": 31,
+          "min_samples_leaf": 100,
+          "calibration_roc_auc": 0.771
+        },
+        {
+          "learning_rate": 0.1,
+          "max_iter": 200,
+          "max_leaf_nodes": 31,
+          "min_samples_leaf": 50,
+          "calibration_roc_auc": 0.7707
+        },
+        {
+          "learning_rate": 0.1,
+          "max_iter": 300,
+          "max_leaf_nodes": 63,
+          "min_samples_leaf": 100,
+          "calibration_roc_auc": 0.7671
+        },
+        {
+          "learning_rate": 0.03,
+          "max_iter": 600,
+          "max_leaf_nodes": 15,
+          "min_samples_leaf": 50,
+          "calibration_roc_auc": 0.7719
+        }
+      ],
+      "baseline": {
+        "la": 37.0,
+        "ld": 8.0,
+        "nf": 3.0,
+        "nd": 2.0,
+        "ns": 1.0,
+        "ent": 1.0
+      },
+      "evaluation": {
+        "raw": {
+          "roc_auc": 0.7826,
+          "pr_auc": 0.452,
+          "brier": 0.1471
+        },
+        "calibrated": {
+          "roc_auc": 0.7824,
+          "pr_auc": 0.4418,
+          "brier": 0.1386
+        },
+        "per_project": [
+          {
+            "project": "apache/activemq",
+            "n": 1225,
+            "prevalence": 0.171,
+            "roc_auc": 0.7693,
+            "pr_auc": 0.4363
+          },
+          {
+            "project": "apache/camel",
+            "n": 4540,
+            "prevalence": 0.035,
+            "roc_auc": 0.756,
+            "pr_auc": 0.0966
+          },
+          {
+            "project": "apache/cassandra",
+            "n": 1632,
+            "prevalence": 0.357,
+            "roc_auc": 0.8044,
+            "pr_auc": 0.6709
+          },
+          {
+            "project": "apache/flink",
+            "n": 2338,
+            "prevalence": 0.162,
+            "roc_auc": 0.8016,
+            "pr_auc": 0.422
+          },
+          {
+            "project": "apache/groovy",
+            "n": 1612,
+            "prevalence": 0.092,
+            "roc_auc": 0.7404,
+            "pr_auc": 0.1871
+          },
+          {
+            "project": "apache/hadoop-hdfs",
+            "n": 581,
+            "prevalence": 0.788,
+            "roc_auc": 0.9477,
+            "pr_auc": 0.9833
+          },
+          {
+            "project": "apache/hadoop-mapreduce",
+            "n": 264,
+            "prevalence": 0.777,
+            "roc_auc": 0.9262,
+            "pr_auc": 0.9762
+          },
+          {
+            "project": "apache/hbase",
+            "n": 1746,
+            "prevalence": 0.254,
+            "roc_auc": 0.7549,
+            "pr_auc": 0.4625
+          },
+          {
+            "project": "apache/hive",
+            "n": 1368,
+            "prevalence": 0.379,
+            "roc_auc": 0.7992,
+            "pr_auc": 0.6733
+          },
+          {
+            "project": "apache/ignite",
+            "n": 2407,
+            "prevalence": 0.377,
+            "roc_auc": 0.832,
+            "pr_auc": 0.695
+          },
+          {
+            "project": "apache/kafka",
+            "n": 477,
+            "prevalence": 0.203,
+            "roc_auc": 0.7777,
+            "pr_auc": 0.472
+          },
+          {
+            "project": "apache/spark",
+            "n": 293,
+            "prevalence": 0.208,
+            "roc_auc": 0.7983,
+            "pr_auc": 0.4325
+          },
+          {
+            "project": "apache/zeppelin",
+            "n": 290,
+            "prevalence": 0.31,
+            "roc_auc": 0.7069,
+            "pr_auc": 0.5292
+          },
+          {
+            "project": "apache/zookeeper",
+            "n": 168,
+            "prevalence": 0.083,
+            "roc_auc": 0.8024,
+            "pr_auc": 0.2303
+          }
+        ]
+      },
+      "attributions": {
+        "permutation_importance_roc_auc": {
+          "la": {
+            "mean": 0.2506,
+            "std": 0.0011
+          },
+          "ld": {
+            "mean": 0.0269,
+            "std": 0.0007
+          },
+          "nf": {
+            "mean": 0.0165,
+            "std": 0.0008
+          },
+          "nd": {
+            "mean": 0.0055,
+            "std": 0.0003
+          },
+          "ns": {
+            "mean": 0.023,
+            "std": 0.001
+          },
+          "ent": {
+            "mean": 0.0229,
+            "std": 0.0003
+          }
+        },
+        "mean_abs_shap_log_odds": {
+          "la": 1.1747,
+          "ld": 0.1691,
+          "nf": 0.0634,
+          "nd": 0.0581,
+          "ns": 0.3245,
+          "ent": 0.1078
+        },
+        "shap_version": "0.51.0",
+        "shap_sample_size": 5000
+      }
+    }
+  },
+  "versions": {
+    "sklearn": "1.9.1",
+    "numpy": "2.4.6",
+    "pandas": "3.0.6"
+  },
+  "artifact_sha256": "66cc81b7e63ad7582d9a4124318c30db6d80650aa1b4d8e32457763e8c145460",
+  "artifact_size_bytes": 806912
+}

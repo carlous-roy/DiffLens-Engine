@@ -130,3 +130,20 @@ def test_pipeline_reports_nesting_depth():
     assert [(f["function_name"], f["nesting_depth"], f["line_number"]) for f in nesting] == [
         ("ProcessData", 4, 9)
     ]
+
+
+def test_ml_feature_flags_are_honoured(monkeypatch):
+    """ML_ENABLE_* settings switch the corresponding module off."""
+    from app.config import get_settings
+
+    monkeypatch.setenv("ML_ENABLE_RISK_SCORING", "false")
+    monkeypatch.setenv("ML_ENABLE_SIMILARITY", "false")
+    monkeypatch.setenv("ML_ENABLE_CATEGORIZATION", "true")
+    get_settings.cache_clear()
+    try:
+        result = run_analysis(SAMPLE_PYTHON_DIFF, enable_ml=True)
+    finally:
+        get_settings.cache_clear()
+    assert result.risk_score is None
+    assert result.similar_findings is None
+    assert result.categorization is not None
