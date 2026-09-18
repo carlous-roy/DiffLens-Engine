@@ -1,22 +1,23 @@
 """PR analysis service — orchestrates the full GitHub PR review flow."""
-import logging
-from typing import Optional
 
-from app.analysis.pipeline import run_analysis, AnalysisResult
+import logging
+
+from app.analysis.pipeline import AnalysisResult, run_analysis
+from app.config import get_settings
+from app.db import SessionLocal
+from app.db.models import AnalysisFinding, AnalysisRun, GitHubPR, SeverityLevel
 from app.github.client import GitHubClient
 from app.github.formatter import (
-    format_summary_comment,
     findings_to_annotations,
     findings_to_review_comments,
+    format_summary_comment,
     risk_level_to_conclusion,
     risk_level_to_status_state,
 )
-from app.db import SessionLocal
-from app.db.models import AnalysisRun, AnalysisFinding, SeverityLevel, GitHubPR
-from app.config import get_settings
 from app.ml.smart_review import smart_review
 
 logger = logging.getLogger(__name__)
+
 
 async def analyze_pull_request(
     owner: str,
@@ -24,7 +25,7 @@ async def analyze_pull_request(
     number: int,
     head_sha: str,
     action: str = "opened",
-    token: Optional[str] = None,
+    token: str | None = None,
 ) -> dict:
     """Full PR analysis flow."""
     settings = get_settings()
@@ -39,7 +40,9 @@ async def analyze_pull_request(
 
     try:
         await client.set_commit_status(
-            owner, repo, head_sha,
+            owner,
+            repo,
+            head_sha,
             state="pending",
             description="DiffLens is analyzing your code...",
             target_url=f"{settings.app_public_url}/runs" if settings.app_public_url else None,
@@ -52,14 +55,16 @@ async def analyze_pull_request(
         diff_text = await client.get_pr_diff(owner, repo, number)
         if not diff_text or not diff_text.strip():
             logger.warning(f"Empty diff for {owner}/{repo}#{number}")
-            await _set_final_status(client, owner, repo, head_sha, "success",
-                                     "No code changes to analyze.")
+            await _set_final_status(
+                client, owner, repo, head_sha, "success", "No code changes to analyze."
+            )
             result_info["status"] = "skipped"
             return result_info
     except Exception as e:
         logger.error(f"Failed to fetch diff: {e}")
-        await _set_final_status(client, owner, repo, head_sha, "error",
-                                 f"Failed to fetch diff: {e}")
+        await _set_final_status(
+            client, owner, repo, head_sha, "error", f"Failed to fetch diff: {e}"
+        )
         result_info["status"] = "error"
         result_info["error"] = str(e)
         return result_info
@@ -67,13 +72,11 @@ async def analyze_pull_request(
     try:
         analysis = run_analysis(diff_text, enable_ml=True)
         logger.info(
-            f"Analysis complete: {analysis.total_findings} findings, "
-            f"risk={analysis.risk_score}"
+            f"Analysis complete: {analysis.total_findings} findings, risk={analysis.risk_score}"
         )
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
-        await _set_final_status(client, owner, repo, head_sha, "error",
-                                 f"Analysis failed: {e}")
+        await _set_final_status(client, owner, repo, head_sha, "error", f"Analysis failed: {e}")
         result_info["status"] = "error"
         result_info["error"] = str(e)
         return result_info
@@ -88,8 +91,14 @@ async def analyze_pull_request(
 
     try:
         await _post_results(
-            client, owner, repo, number, head_sha,
-            analysis, smart_review_result, settings,
+            client,
+            owner,
+            repo,
+            number,
+            head_sha,
+            analysis,
+            smart_review_result,
+            settings,
         )
         result_info["status"] = "completed"
     except Exception as e:
@@ -99,8 +108,14 @@ async def analyze_pull_request(
 
     try:
         run_id = _persist_analysis(
-            owner, repo, number, head_sha, action,
-            diff_text, analysis, smart_review_result,
+            owner,
+            repo,
+            number,
+            head_sha,
+            action,
+            diff_text,
+            analysis,
+            smart_review_result,
         )
         result_info["run_id"] = str(run_id)
     except Exception as e:
@@ -109,6 +124,7 @@ async def analyze_pull_request(
 
     return result_info
 
+
 async def _post_results(
     client: GitHubClient,
     owner: str,
@@ -116,7 +132,7 @@ async def _post_results(
     number: int,
     head_sha: str,
     analysis: AnalysisResult,
-    smart_review_result: Optional[dict],
+    smart_review_result: dict | None,
     settings,
 ):
     """Post analysis results back to GitHub via multiple channels."""
@@ -126,14 +142,13 @@ async def _post_results(
         risk_level = analysis.risk_score.get("level", "low")
 
     status_state = risk_level_to_status_state(risk_level)
-    status_desc = (
-        f"{analysis.total_findings} findings · "
-        f"Risk: {risk_level.upper()}"
-    )
+    status_desc = f"{analysis.total_findings} findings · Risk: {risk_level.upper()}"
     run_url = f"{settings.app_public_url}/runs" if settings.app_public_url else None
 
     await client.set_commit_status(
-        owner, repo, head_sha,
+        owner,
+        repo,
+        head_sha,
         state=status_state,
         description=status_desc,
         target_url=run_url,
@@ -153,7 +168,10 @@ async def _post_results(
             event = "REQUEST_CHANGES" if risk_level in ("high", "critical") else "COMMENT"
             try:
                 await client.create_pr_review(
-                    owner, repo, number, head_sha,
+                    owner,
+                    repo,
+                    number,
+                    head_sha,
                     body=review_body,
                     event=event,
                     comments=review_comments[:25],  # Limit inline comments
@@ -173,7 +191,9 @@ async def _post_results(
             summary_md = format_summary_comment(analysis, smart_review_result)
 
             await client.update_check_run(
-                owner, repo, check_id,
+                owner,
+                repo,
+                check_id,
                 conclusion=conclusion,
                 title=f"DiffLens: {analysis.total_findings} findings",
                 summary=summary_md,
@@ -181,6 +201,7 @@ async def _post_results(
             )
         except Exception as e:
             logger.warning(f"Check run API failed (token may lack checks:write): {e}")
+
 
 async def _set_final_status(
     client: GitHubClient,
@@ -196,6 +217,7 @@ async def _set_final_status(
     except Exception as e:
         logger.warning(f"Failed to set final status: {e}")
 
+
 def _persist_analysis(
     owner: str,
     repo: str,
@@ -204,7 +226,7 @@ def _persist_analysis(
     action: str,
     diff_text: str,
     analysis: AnalysisResult,
-    smart_review_result: Optional[dict],
+    smart_review_result: dict | None,
 ) -> str:
     """Persist the analysis run and GitHub PR metadata to the database."""
     db = SessionLocal()
@@ -232,29 +254,47 @@ def _persist_analysis(
         # Persist findings
         all_findings = []
         for f in analysis.complexity_findings:
-            all_findings.append(AnalysisFinding(
-                run_id=run.id, analyzer="complexity",
-                file_path=f["file_path"], line_number=f.get("line_number"),
-                severity=SeverityLevel(f["severity"].lower()),
-                message=f["message"], suggestion=f.get("suggestion"),
-                metadata_={"function_name": f.get("function_name"), "complexity": f.get("complexity")},
-            ))
+            all_findings.append(
+                AnalysisFinding(
+                    run_id=run.id,
+                    analyzer="complexity",
+                    file_path=f["file_path"],
+                    line_number=f.get("line_number"),
+                    severity=SeverityLevel(f["severity"].lower()),
+                    message=f["message"],
+                    suggestion=f.get("suggestion"),
+                    metadata_={
+                        "function_name": f.get("function_name"),
+                        "complexity": f.get("complexity"),
+                    },
+                )
+            )
         for f in analysis.naming_findings:
-            all_findings.append(AnalysisFinding(
-                run_id=run.id, analyzer="naming",
-                file_path=f["file_path"], line_number=f.get("line_number"),
-                severity=SeverityLevel(f["severity"].lower()),
-                message=f["message"], suggestion=f.get("suggestion"),
-                metadata_={"name": f.get("name"), "kind": f.get("kind")},
-            ))
+            all_findings.append(
+                AnalysisFinding(
+                    run_id=run.id,
+                    analyzer="naming",
+                    file_path=f["file_path"],
+                    line_number=f.get("line_number"),
+                    severity=SeverityLevel(f["severity"].lower()),
+                    message=f["message"],
+                    suggestion=f.get("suggestion"),
+                    metadata_={"name": f.get("name"), "kind": f.get("kind")},
+                )
+            )
         for f in analysis.bug_risk_findings:
-            all_findings.append(AnalysisFinding(
-                run_id=run.id, analyzer="bug_risk",
-                file_path=f["file_path"], line_number=f.get("line_number"),
-                severity=SeverityLevel(f["severity"].lower()),
-                message=f["message"], suggestion=f.get("suggestion"),
-                metadata_={"rule_id": f.get("rule_id"), "matched_text": f.get("matched_text")},
-            ))
+            all_findings.append(
+                AnalysisFinding(
+                    run_id=run.id,
+                    analyzer="bug_risk",
+                    file_path=f["file_path"],
+                    line_number=f.get("line_number"),
+                    severity=SeverityLevel(f["severity"].lower()),
+                    message=f["message"],
+                    suggestion=f.get("suggestion"),
+                    metadata_={"rule_id": f.get("rule_id"), "matched_text": f.get("matched_text")},
+                )
+            )
 
         db.add_all(all_findings)
         db.commit()

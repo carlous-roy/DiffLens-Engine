@@ -1,11 +1,11 @@
 """Complexity analyzer that uses Tree-sitter AST parsing to calculate the
 cyclomatic complexity of each function and method in a source file."""
+
 from dataclasses import dataclass
-from typing import Optional
 
 try:
-    import tree_sitter_python as tspython
     import tree_sitter_java as tsjava
+    import tree_sitter_python as tspython
     from tree_sitter import Language, Parser
 
     PY_LANGUAGE = Language(tspython.language())
@@ -14,9 +14,9 @@ try:
 except Exception:
     # Fallback: try older API style
     try:
-        from tree_sitter import Language, Parser
-        import tree_sitter_python as tspython
         import tree_sitter_java as tsjava
+        import tree_sitter_python as tspython
+        from tree_sitter import Language, Parser
 
         PY_LANGUAGE = Language(tspython.language())
         JAVA_LANGUAGE = Language(tsjava.language())
@@ -26,33 +26,49 @@ except Exception:
         PY_LANGUAGE = None
         JAVA_LANGUAGE = None
 
+
 @dataclass
 class ComplexityFinding:
     """Result of complexity analysis on a function/method."""
+
     function_name: str
     line_number: int
     complexity: int
     file_path: str
     severity: str  # info, warning, error, critical
     message: str
-    suggestion: Optional[str] = None
+    suggestion: str | None = None
+
 
 # Nodes that add to cyclomatic complexity
 PYTHON_BRANCH_NODES = {
-    "if_statement", "elif_clause", "for_statement", "while_statement",
-    "except_clause", "with_statement", "assert_statement",
+    "if_statement",
+    "elif_clause",
+    "for_statement",
+    "while_statement",
+    "except_clause",
+    "with_statement",
+    "assert_statement",
     "boolean_operator",  # `and` / `or`
     "conditional_expression",  # ternary
-    "list_comprehension", "set_comprehension", "dictionary_comprehension",
+    "list_comprehension",
+    "set_comprehension",
+    "dictionary_comprehension",
     "generator_expression",
 }
 
 JAVA_BRANCH_NODES = {
-    "if_statement", "for_statement", "enhanced_for_statement",
-    "while_statement", "do_statement", "catch_clause",
-    "switch_expression", "ternary_expression",
+    "if_statement",
+    "for_statement",
+    "enhanced_for_statement",
+    "while_statement",
+    "do_statement",
+    "catch_clause",
+    "switch_expression",
+    "ternary_expression",
     "binary_expression",  # we check for && and || specifically
 }
+
 
 def _count_complexity(node, branch_nodes: set, language: str) -> int:
     """Recursively count branching nodes in an AST subtree."""
@@ -69,6 +85,7 @@ def _count_complexity(node, branch_nodes: set, language: str) -> int:
         count += _count_complexity(child, branch_nodes, language)
     return count
 
+
 def _severity_for_complexity(complexity: int) -> str:
     """Map complexity score to severity level."""
     if complexity <= 5:
@@ -79,17 +96,20 @@ def _severity_for_complexity(complexity: int) -> str:
         return "error"
     return "critical"
 
+
 def analyze_complexity(source_code: str, file_path: str, language: str) -> list[ComplexityFinding]:
     """Analyze cyclomatic complexity of functions/methods in source code."""
     if not TREE_SITTER_AVAILABLE:
-        return [ComplexityFinding(
-            function_name="<unavailable>",
-            line_number=0,
-            complexity=0,
-            file_path=file_path,
-            severity="info",
-            message="Tree-sitter not available; skipping complexity analysis.",
-        )]
+        return [
+            ComplexityFinding(
+                function_name="<unavailable>",
+                line_number=0,
+                complexity=0,
+                file_path=file_path,
+                severity="info",
+                message="Tree-sitter not available; skipping complexity analysis.",
+            )
+        ]
 
     parser = Parser()
 
@@ -123,15 +143,17 @@ def analyze_complexity(source_code: str, file_path: str, language: str) -> list[
                     f"Extract conditional branches or loop bodies into helper methods."
                 )
 
-            findings.append(ComplexityFinding(
-                function_name=func_name,
-                line_number=line,
-                complexity=complexity,
-                file_path=file_path,
-                severity=severity,
-                message=f"Function '{func_name}' has cyclomatic complexity of {complexity}.",
-                suggestion=suggestion,
-            ))
+            findings.append(
+                ComplexityFinding(
+                    function_name=func_name,
+                    line_number=line,
+                    complexity=complexity,
+                    file_path=file_path,
+                    severity=severity,
+                    message=f"Function '{func_name}' has cyclomatic complexity of {complexity}.",
+                    suggestion=suggestion,
+                )
+            )
 
         for child in node.children:
             _walk(child)

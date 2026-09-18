@@ -1,5 +1,7 @@
 """Tests for the auto-categorization module."""
-from app.ml.categorization import categorize_findings, _classify_single
+
+from app.ml.categorization import _classify_single, categorize_findings
+
 
 class TestClassification:
     def test_security_eval(self):
@@ -10,9 +12,7 @@ class TestClassification:
         assert conf > 0.8
 
     def test_correctness_mutable_default(self):
-        cat, conf, _ = _classify_single(
-            "Mutable default argument detected.", "bug_risk", "error"
-        )
+        cat, conf, _ = _classify_single("Mutable default argument detected.", "bug_risk", "error")
         assert cat == "correctness"
         assert conf > 0.8
 
@@ -31,37 +31,47 @@ class TestClassification:
     def test_maintainability_global(self):
         cat, conf, _ = _classify_single(
             "Use of 'global' keyword. Global state makes code harder to test.",
-            "bug_risk", "warning"
+            "bug_risk",
+            "warning",
         )
         assert cat == "maintainability"
 
     def test_maintainability_todo(self):
-        cat, conf, _ = _classify_single(
-            "TODO/FIXME comment found in new code.", "bug_risk", "info"
-        )
+        cat, conf, _ = _classify_single("TODO/FIXME comment found in new code.", "bug_risk", "info")
         assert cat == "maintainability"
 
     def test_maintainability_complexity(self):
         cat, conf, _ = _classify_single(
-            "Function 'process' has cyclomatic complexity of 15.",
-            "complexity", "error"
+            "Function 'process' has cyclomatic complexity of 15.", "complexity", "error"
         )
         assert cat == "performance"
 
     def test_fallback_to_analyzer_default(self):
         cat, conf, _ = _classify_single(
-            "Some obscure finding with no pattern match.",
-            "complexity", "info"
+            "Some obscure finding with no pattern match.", "complexity", "info"
         )
         assert cat == "maintainability"  # complexity analyzer default
         assert conf < 0.8
 
+
 class TestCategorizationResult:
     def test_basic_categorization(self):
         findings = [
-            {"message": "Use of eval() is a security risk.", "analyzer": "bug_risk", "severity": "critical"},
-            {"message": "Function 'foo' should use snake_case.", "analyzer": "naming", "severity": "warning"},
-            {"message": "Mutable default argument detected.", "analyzer": "bug_risk", "severity": "error"},
+            {
+                "message": "Use of eval() is a security risk.",
+                "analyzer": "bug_risk",
+                "severity": "critical",
+            },
+            {
+                "message": "Function 'foo' should use snake_case.",
+                "analyzer": "naming",
+                "severity": "warning",
+            },
+            {
+                "message": "Mutable default argument detected.",
+                "analyzer": "bug_risk",
+                "severity": "error",
+            },
             {"message": "TODO comment found.", "analyzer": "bug_risk", "severity": "info"},
         ]
         result = categorize_findings(findings)

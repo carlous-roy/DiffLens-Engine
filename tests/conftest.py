@@ -1,14 +1,45 @@
-"""Shared test fixtures and configuration."""
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+"""Shared test fixtures and configuration.
 
-from app.db import Base, get_db
-from app.main import app
+The suite is hermetic: it never reads a developer's `.env` or ambient GitHub
+credentials, and it never opens a network connection. Anything that would
+talk to GitHub or an LLM is replaced with a stub below.
+"""
+
+import os
+
+# Must run before `app` is imported: settings are read once at import time.
+for _var in ("GITHUB_TOKEN", "GH_TOKEN", "GITHUB_WEBHOOK_SECRET", "DATABASE_URL"):
+    os.environ.pop(_var, None)
+os.environ["DIFFLENS_ENV_FILE"] = ""
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+from sqlalchemy.pool import StaticPool  # noqa: E402
+
+from app.db import Base, get_db  # noqa: E402
+from app.github import client as github_client  # noqa: E402
+from app.main import app  # noqa: E402
 
 SQLALCHEMY_TEST_URL = "sqlite://"
+
+
+@pytest.fixture(autouse=True)
+def _no_github_network(monkeypatch):
+    """Never let a test reach api.github.com.
+
+    `verify_token` is the one call the status endpoint makes on its own; the
+    rest of the client is exercised through an explicit mocked transport in
+    the PR-flow tests.
+    """
+
+    async def _fake_verify_token(self):
+        return {"login": "difflens-test-bot", "id": 1}
+
+    monkeypatch.setattr(github_client.GitHubClient, "verify_token", _fake_verify_token)
+    yield
+
 
 @pytest.fixture(scope="function")
 def db_session():
@@ -19,17 +50,19 @@ def db_session():
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = TestingSessionLocal()
+    testing_session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = testing_session_local()
     try:
         yield session
     finally:
         session.close()
         Base.metadata.drop_all(bind=engine)
 
+
 @pytest.fixture(scope="function")
 def client(db_session):
     """FastAPI test client with overridden database dependency."""
+
     def override_get_db():
         try:
             yield db_session
@@ -40,6 +73,7 @@ def client(db_session):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
 
 SAMPLE_PYTHON_DIFF = """diff --git a/utils/helpers.py b/utils/helpers.py
 new file mode 100644

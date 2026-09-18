@@ -1,6 +1,9 @@
 """Tests for the complexity analyzer."""
-from app.analysis.complexity import analyze_complexity, TREE_SITTER_AVAILABLE
+
 import pytest
+
+from app.analysis.complexity import TREE_SITTER_AVAILABLE, analyze_complexity
+
 
 @pytest.mark.skipif(not TREE_SITTER_AVAILABLE, reason="tree-sitter not installed")
 class TestPythonComplexity:
@@ -29,6 +32,7 @@ def process(data):
         # if / for / if / elif each add a branch on top of the base path
         assert findings[0].complexity >= 4
         assert findings[0].severity in ("info", "warning")
+
 
 @pytest.mark.skipif(not TREE_SITTER_AVAILABLE, reason="tree-sitter not installed")
 class TestJavaComplexity:

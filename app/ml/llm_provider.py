@@ -1,23 +1,28 @@
 """Pluggable LLM provider abstraction."""
-import httpx
+
 import logging
 from dataclasses import dataclass
-from typing import Optional
+
+import httpx
+
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class LLMResponse:
     """Structured response from an LLM provider."""
+
     content: str
     model: str
-    tokens_used: Optional[int] = None
-    error: Optional[str] = None
+    tokens_used: int | None = None
+    error: str | None = None
 
     @property
     def ok(self) -> bool:
         return self.error is None
+
 
 class LLMProvider:
     """Unified LLM interface. Defaults to Ollama running locally."""
@@ -30,16 +35,18 @@ class LLMProvider:
         self.api_key = settings.llm_api_key
         self.timeout = settings.llm_timeout
 
-    async def generate(self, prompt: str, system_prompt: Optional[str] = None) -> LLMResponse:
+    async def generate(self, prompt: str, system_prompt: str | None = None) -> LLMResponse:
         """Generate a completion from the LLM."""
         if self.provider == "ollama":
             return await self._ollama_generate(prompt, system_prompt)
         elif self.provider == "openai":
             return await self._openai_generate(prompt, system_prompt)
         else:
-            return LLMResponse(content="", model=self.model, error=f"Unknown provider: {self.provider}")
+            return LLMResponse(
+                content="", model=self.model, error=f"Unknown provider: {self.provider}"
+            )
 
-    async def _ollama_generate(self, prompt: str, system_prompt: Optional[str] = None) -> LLMResponse:
+    async def _ollama_generate(self, prompt: str, system_prompt: str | None = None) -> LLMResponse:
         """Call Ollama's /api/generate endpoint."""
         url = f"{self.base_url}/api/generate"
         payload = {
@@ -66,12 +73,16 @@ class LLMProvider:
                 )
         except httpx.ConnectError:
             logger.warning("Ollama not reachable at %s — is it running?", self.base_url)
-            return LLMResponse(content="", model=self.model, error="Ollama not reachable. Ensure the Ollama service is running.")
+            return LLMResponse(
+                content="",
+                model=self.model,
+                error="Ollama not reachable. Ensure the Ollama service is running.",
+            )
         except Exception as e:
             logger.error("Ollama error: %s", str(e))
             return LLMResponse(content="", model=self.model, error=str(e))
 
-    async def _openai_generate(self, prompt: str, system_prompt: Optional[str] = None) -> LLMResponse:
+    async def _openai_generate(self, prompt: str, system_prompt: str | None = None) -> LLMResponse:
         """Call an OpenAI-compatible /v1/chat/completions endpoint."""
         url = f"{self.base_url}/v1/chat/completions"
         messages = []
@@ -129,8 +140,10 @@ class LLMProvider:
         except Exception:
             return []
 
+
 # Singleton
-_provider: Optional[LLMProvider] = None
+_provider: LLMProvider | None = None
+
 
 def get_llm_provider() -> LLMProvider:
     global _provider

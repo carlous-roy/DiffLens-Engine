@@ -1,9 +1,11 @@
 """Tests for GitHub webhook API routes."""
+
 import hashlib
 import hmac
 import json
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -32,10 +34,12 @@ SAMPLE_PR_PAYLOAD = {
     },
 }
 
+
 def _sign(body: bytes, secret: str = TEST_WEBHOOK_SECRET) -> str:
     """Build the X-Hub-Signature-256 header GitHub would send for this body."""
     digest = hmac.new(secret.encode(), msg=body, digestmod=hashlib.sha256).hexdigest()
     return f"sha256={digest}"
+
 
 def _post(body: bytes, event: str, delivery: str, sign: bool = True):
     headers = {
@@ -46,6 +50,7 @@ def _post(body: bytes, event: str, delivery: str, sign: bool = True):
     if sign:
         headers["X-Hub-Signature-256"] = _sign(body)
     return client.post("/api/v1/github/webhook", content=body, headers=headers)
+
 
 class TestWebhookEndpoint:
     @pytest.fixture(autouse=True)
@@ -108,6 +113,7 @@ class TestWebhookEndpoint:
         )
         assert resp.status_code == 401
 
+
 class TestGitHubStatus:
     def test_status_without_token(self):
         resp = client.get("/api/v1/github/status")
@@ -121,3 +127,27 @@ class TestGitHubStatus:
         assert "features" in data
         assert "post_comment" in data["features"]
         assert "post_review" in data["features"]
+
+    def test_status_with_token_uses_stubbed_verification(self, monkeypatch):
+        """With a token configured the endpoint reports the login from the
+        stubbed `verify_token`; no request leaves the process."""
+        monkeypatch.setenv("GITHUB_TOKEN", "ghp_test_not_a_real_token")
+        get_settings.cache_clear()
+        try:
+            resp = client.get("/api/v1/github/status")
+        finally:
+            get_settings.cache_clear()
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["configured"] is True
+        assert data["authenticated_as"] == "difflens-test-bot"
+
+
+class TestHermeticEnvironment:
+    def test_ambient_github_credentials_are_not_read(self):
+        """conftest strips GITHUB_TOKEN/GH_TOKEN before settings load."""
+        import os
+
+        assert "GITHUB_TOKEN" not in os.environ
+        assert "GH_TOKEN" not in os.environ
+        assert get_settings().github_token is None

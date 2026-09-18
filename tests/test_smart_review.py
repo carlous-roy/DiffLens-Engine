@@ -1,9 +1,11 @@
 """Tests for the smart review module."""
-from app.ml.smart_review import _parse_llm_response, _build_review_prompt, ReviewComment
+
+from app.ml.smart_review import _build_review_prompt, _parse_llm_response
+
 
 class TestParseResponse:
     def test_valid_json(self):
-        raw = '''{
+        raw = """{
             "comments": [
                 {
                     "file": "test.py",
@@ -15,7 +17,7 @@ class TestParseResponse:
                 }
             ],
             "overall_summary": "Code has security issues."
-        }'''
+        }"""
         comments, summary = _parse_llm_response(raw)
         assert len(comments) == 1
         assert comments[0].file == "test.py"
@@ -24,12 +26,13 @@ class TestParseResponse:
         assert summary == "Code has security issues."
 
     def test_json_in_markdown_fences(self):
-        raw = '''```json
+        raw = """```json
         {
-            "comments": [{"file": "a.py", "line": 1, "severity": "info", "category": "style", "comment": "test"}],
+            "comments": [{"file": "a.py", "line": 1, "severity": "info",
+                          "category": "style", "comment": "test"}],
             "overall_summary": "OK"
         }
-        ```'''
+        ```"""
         comments, summary = _parse_llm_response(raw)
         assert len(comments) == 1
         assert summary == "OK"
@@ -47,14 +50,15 @@ class TestParseResponse:
         assert summary == "Clean code."
 
     def test_partial_comment_fields(self):
-        raw = '''{
+        raw = """{
             "comments": [{"comment": "Missing fields test"}],
             "overall_summary": ""
-        }'''
+        }"""
         comments, summary = _parse_llm_response(raw)
         assert len(comments) == 1
         assert comments[0].file == "unknown"
         assert comments[0].severity == "info"
+
 
 class TestBuildPrompt:
     def test_basic_prompt(self):
@@ -65,8 +69,12 @@ class TestBuildPrompt:
     def test_with_static_findings(self):
         findings = {
             "complexity_findings": [
-                {"severity": "warning", "file_path": "a.py", "line_number": 10,
-                 "message": "Function too complex"},
+                {
+                    "severity": "warning",
+                    "file_path": "a.py",
+                    "line_number": 10,
+                    "message": "Function too complex",
+                },
             ],
             "naming_findings": [],
             "bug_risk_findings": [],

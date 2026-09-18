@@ -1,16 +1,21 @@
 """Tests for GitHub output formatter."""
+
 from app.analysis.pipeline import AnalysisResult
 from app.github.formatter import (
-    format_summary_comment,
     findings_to_annotations,
     findings_to_review_comments,
-    risk_level_to_status_state,
+    format_summary_comment,
     risk_level_to_conclusion,
+    risk_level_to_status_state,
 )
 
+
 def _make_analysis(
-    complexity=None, naming=None, bug_risk=None,
-    risk_level="low", risk_score=0.2,
+    complexity=None,
+    naming=None,
+    bug_risk=None,
+    risk_level="low",
+    risk_score=0.2,
 ) -> AnalysisResult:
     """Helper to build an AnalysisResult for testing."""
     result = AnalysisResult()
@@ -32,9 +37,14 @@ def _make_analysis(
             "bug_risk": len(result.bug_risk_findings),
         },
     }
-    result.risk_score = {"level": risk_level, "score": risk_score, "contributing_factors": ["test factor"]}
+    result.risk_score = {
+        "level": risk_level,
+        "score": risk_score,
+        "contributing_factors": ["test factor"],
+    }
     result.categorization = None
     return result
+
 
 SAMPLE_FINDINGS = [
     {
@@ -56,6 +66,7 @@ SAMPLE_FINDINGS = [
         "kind": "function",
     },
 ]
+
 
 class TestFormatSummaryComment:
     def test_contains_header(self):
@@ -91,6 +102,7 @@ class TestFormatSummaryComment:
         assert "AI Review" in comment
         assert "Clean code." in comment
 
+
 class TestAnnotations:
     def test_converts_findings_to_annotations(self):
         analysis = _make_analysis(complexity=[SAMPLE_FINDINGS[0]])
@@ -106,11 +118,12 @@ class TestAnnotations:
         annotations = findings_to_annotations(analysis)
         assert len(annotations) == 0
 
+
 class TestReviewComments:
     def test_only_high_severity(self):
         analysis = _make_analysis(
             complexity=[SAMPLE_FINDINGS[0]],  # error
-            naming=[SAMPLE_FINDINGS[1]],      # warning
+            naming=[SAMPLE_FINDINGS[1]],  # warning
         )
         comments = findings_to_review_comments(analysis)
         # Only error findings should be included
@@ -121,6 +134,7 @@ class TestReviewComments:
         analysis = _make_analysis(complexity=[SAMPLE_FINDINGS[0]])
         comments = findings_to_review_comments(analysis)
         assert "Suggestion" in comments[0]["body"]
+
 
 class TestRiskMapping:
     def test_status_states(self):

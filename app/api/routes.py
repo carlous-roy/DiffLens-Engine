@@ -1,21 +1,26 @@
 """Core REST API routes for DiffLens."""
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import text
 
-from app.db import get_db
-from app.db.models import AnalysisRun, AnalysisFinding, SeverityLevel
-from app.api.schemas import (
-    AnalyzeRequest, AnalyzeResponse, HealthResponse,
-    SummaryResponse, SmartReviewRequest,
-)
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from app.analysis.pipeline import run_analysis
-from app.ml.smart_review import smart_review
-from app.ml.llm_provider import get_llm_provider
+from app.api.schemas import (
+    AnalyzeRequest,
+    AnalyzeResponse,
+    HealthResponse,
+    SmartReviewRequest,
+    SummaryResponse,
+)
 from app.config import get_settings
+from app.db import get_db
+from app.db.models import AnalysisFinding, AnalysisRun, SeverityLevel
+from app.ml.llm_provider import get_llm_provider
+from app.ml.smart_review import smart_review
 
 router = APIRouter()
 settings = get_settings()
+
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check(db: Session = Depends(get_db)):
@@ -52,13 +57,14 @@ async def health_check(db: Session = Depends(get_db)):
         ml_features=ml_features,
     )
 
+
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_diff(request: AnalyzeRequest, db: Session = Depends(get_db)):
     """Analyze a unified diff for code quality issues."""
     try:
         result = run_analysis(request.diff, enable_ml=request.enable_ml)
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Analysis failed: {str(e)}")
+        raise HTTPException(status_code=422, detail=f"Analysis failed: {e}") from e
 
     # Persist the run
     run = AnalysisRun(source=request.source, summary=result.summary)
@@ -68,29 +74,47 @@ async def analyze_diff(request: AnalyzeRequest, db: Session = Depends(get_db)):
     # Persist individual findings
     all_findings = []
     for f in result.complexity_findings:
-        all_findings.append(AnalysisFinding(
-            run_id=run.id, analyzer="complexity",
-            file_path=f["file_path"], line_number=f.get("line_number"),
-            severity=SeverityLevel(f["severity"].lower()),
-            message=f["message"], suggestion=f.get("suggestion"),
-            metadata_={"function_name": f.get("function_name"), "complexity": f.get("complexity")},
-        ))
+        all_findings.append(
+            AnalysisFinding(
+                run_id=run.id,
+                analyzer="complexity",
+                file_path=f["file_path"],
+                line_number=f.get("line_number"),
+                severity=SeverityLevel(f["severity"].lower()),
+                message=f["message"],
+                suggestion=f.get("suggestion"),
+                metadata_={
+                    "function_name": f.get("function_name"),
+                    "complexity": f.get("complexity"),
+                },
+            )
+        )
     for f in result.naming_findings:
-        all_findings.append(AnalysisFinding(
-            run_id=run.id, analyzer="naming",
-            file_path=f["file_path"], line_number=f.get("line_number"),
-            severity=SeverityLevel(f["severity"].lower()),
-            message=f["message"], suggestion=f.get("suggestion"),
-            metadata_={"name": f.get("name"), "kind": f.get("kind")},
-        ))
+        all_findings.append(
+            AnalysisFinding(
+                run_id=run.id,
+                analyzer="naming",
+                file_path=f["file_path"],
+                line_number=f.get("line_number"),
+                severity=SeverityLevel(f["severity"].lower()),
+                message=f["message"],
+                suggestion=f.get("suggestion"),
+                metadata_={"name": f.get("name"), "kind": f.get("kind")},
+            )
+        )
     for f in result.bug_risk_findings:
-        all_findings.append(AnalysisFinding(
-            run_id=run.id, analyzer="bug_risk",
-            file_path=f["file_path"], line_number=f.get("line_number"),
-            severity=SeverityLevel(f["severity"].lower()),
-            message=f["message"], suggestion=f.get("suggestion"),
-            metadata_={"rule_id": f.get("rule_id"), "matched_text": f.get("matched_text")},
-        ))
+        all_findings.append(
+            AnalysisFinding(
+                run_id=run.id,
+                analyzer="bug_risk",
+                file_path=f["file_path"],
+                line_number=f.get("line_number"),
+                severity=SeverityLevel(f["severity"].lower()),
+                message=f["message"],
+                suggestion=f.get("suggestion"),
+                metadata_={"rule_id": f.get("rule_id"), "matched_text": f.get("matched_text")},
+            )
+        )
 
     db.add_all(all_findings)
     db.commit()
@@ -120,6 +144,7 @@ async def analyze_diff(request: AnalyzeRequest, db: Session = Depends(get_db)):
         smart_review=review_result,
     )
 
+
 @router.post("/smart-review")
 async def standalone_smart_review(request: SmartReviewRequest):
     """Standalone LLM-powered smart review endpoint."""
@@ -130,7 +155,8 @@ async def standalone_smart_review(request: SmartReviewRequest):
         result = await smart_review(request.diff)
         return result.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Smart review failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Smart review failed: {e}") from e
+
 
 @router.get("/ml/status")
 async def ml_status():
@@ -162,15 +188,11 @@ async def ml_status():
         },
     }
 
+
 @router.get("/runs")
 def list_runs(limit: int = 20, db: Session = Depends(get_db)):
     """List recent analysis runs."""
-    runs = (
-        db.query(AnalysisRun)
-        .order_by(AnalysisRun.created_at.desc())
-        .limit(limit)
-        .all()
-    )
+    runs = db.query(AnalysisRun).order_by(AnalysisRun.created_at.desc()).limit(limit).all()
     return [
         {
             "id": str(r.id),
@@ -181,6 +203,7 @@ def list_runs(limit: int = 20, db: Session = Depends(get_db)):
         }
         for r in runs
     ]
+
 
 @router.get("/runs/{run_id}")
 def get_run(run_id: str, db: Session = Depends(get_db)):

@@ -4,18 +4,19 @@ Revision ID: 002_github_prs
 Revises: 001_initial
 Create Date: 2025-02-25
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 
+from alembic import op
 from app.db.models import UUIDType
 
 # revision identifiers, used by Alembic.
 revision: str = "002_github_prs"
-down_revision: Union[str, None] = "001_initial"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "001_initial"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -34,9 +35,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_github_prs_run_id", "github_prs", ["run_id"])
-    op.create_index(
-        "ix_github_prs_owner_repo_number", "github_prs", ["owner", "repo", "pr_number"]
-    )
+    op.create_index("ix_github_prs_owner_repo_number", "github_prs", ["owner", "repo", "pr_number"])
     op.create_index("ix_github_prs_head_sha", "github_prs", ["head_sha"])
 
 

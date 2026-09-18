@@ -1,10 +1,10 @@
 """Smart Code Review — LLM-powered review comment generation."""
+
 import json
 import logging
-from dataclasses import dataclass, field, asdict
-from typing import Optional
+from dataclasses import asdict, dataclass, field
 
-from app.ml.llm_provider import get_llm_provider, LLMResponse
+from app.ml.llm_provider import LLMResponse, get_llm_provider
 
 logger = logging.getLogger(__name__)
 
@@ -31,24 +31,28 @@ Respond ONLY with valid JSON in this exact format:
   "overall_summary": "1-2 sentence summary of the change quality"
 }"""
 
+
 @dataclass
 class ReviewComment:
     """A single LLM-generated review comment."""
+
     file: str
-    line: Optional[int]
+    line: int | None
     severity: str
     category: str
     comment: str
-    suggestion: Optional[str] = None
+    suggestion: str | None = None
+
 
 @dataclass
 class SmartReviewResult:
     """Complete result from the smart review."""
+
     comments: list[ReviewComment] = field(default_factory=list)
     overall_summary: str = ""
     model_used: str = ""
-    tokens_used: Optional[int] = None
-    error: Optional[str] = None
+    tokens_used: int | None = None
+    error: str | None = None
     llm_available: bool = True
 
     def to_dict(self) -> dict:
@@ -61,7 +65,8 @@ class SmartReviewResult:
             "llm_available": self.llm_available,
         }
 
-def _build_review_prompt(diff_text: str, static_findings: Optional[dict] = None) -> str:
+
+def _build_review_prompt(diff_text: str, static_findings: dict | None = None) -> str:
     """Build the prompt that combines diff + static analysis context."""
     # Truncate very large diffs to stay within context window
     max_diff_chars = 6000
@@ -87,6 +92,7 @@ def _build_review_prompt(diff_text: str, static_findings: Optional[dict] = None)
 
     return prompt
 
+
 def _parse_llm_response(raw: str) -> tuple[list[ReviewComment], str]:
     """Parse the LLM JSON response into structured comments."""
     comments = []
@@ -110,37 +116,44 @@ def _parse_llm_response(raw: str) -> tuple[list[ReviewComment], str]:
                 data = json.loads(text[start:end])
             except json.JSONDecodeError:
                 logger.warning("Could not parse LLM response as JSON")
-                return [ReviewComment(
+                return [
+                    ReviewComment(
+                        file="general",
+                        line=None,
+                        severity="info",
+                        category="maintainability",
+                        comment=raw[:500],
+                    )
+                ], "LLM response could not be parsed as structured JSON."
+        else:
+            return [
+                ReviewComment(
                     file="general",
                     line=None,
                     severity="info",
                     category="maintainability",
                     comment=raw[:500],
-                )], "LLM response could not be parsed as structured JSON."
-        else:
-            return [ReviewComment(
-                file="general",
-                line=None,
-                severity="info",
-                category="maintainability",
-                comment=raw[:500],
-            )], "LLM response was not structured JSON."
+                )
+            ], "LLM response was not structured JSON."
 
     summary = data.get("overall_summary", "")
 
     for c in data.get("comments", []):
-        comments.append(ReviewComment(
-            file=c.get("file", "unknown"),
-            line=c.get("line"),
-            severity=c.get("severity", "info"),
-            category=c.get("category", "maintainability"),
-            comment=c.get("comment", ""),
-            suggestion=c.get("suggestion"),
-        ))
+        comments.append(
+            ReviewComment(
+                file=c.get("file", "unknown"),
+                line=c.get("line"),
+                severity=c.get("severity", "info"),
+                category=c.get("category", "maintainability"),
+                comment=c.get("comment", ""),
+                suggestion=c.get("suggestion"),
+            )
+        )
 
     return comments, summary
 
-async def smart_review(diff_text: str, static_findings: Optional[dict] = None) -> SmartReviewResult:
+
+async def smart_review(diff_text: str, static_findings: dict | None = None) -> SmartReviewResult:
     """Run LLM-powered smart review on a diff."""
     provider = get_llm_provider()
 

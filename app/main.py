@@ -1,17 +1,21 @@
 """DiffLens FastAPI entrypoint."""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
-from app.github.routes import github_router
 from app.config import get_settings
+from app.github.routes import github_router
 
 settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="ML-powered code review with static analysis, risk scoring, and GitHub integration.",
+    description=(
+        "Code review for Python and Java diffs: Tree-sitter static analysis, "
+        "change-risk scoring and GitHub pull request integration."
+    ),
 )
 
 allowed_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
@@ -26,6 +30,7 @@ app.add_middleware(
 
 app.include_router(router, prefix="/api/v1")
 app.include_router(github_router, prefix="/api/v1")
+
 
 @app.get("/")
 def root():

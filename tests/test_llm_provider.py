@@ -1,5 +1,7 @@
 """Tests for the LLM provider module."""
+
 from app.ml.llm_provider import LLMProvider, LLMResponse
+
 
 class TestLLMResponse:
     def test_ok_response(self):
@@ -10,6 +12,7 @@ class TestLLMResponse:
         resp = LLMResponse(content="", model="test", error="Connection failed")
         assert resp.ok is False
 
+
 class TestLLMProvider:
     def test_provider_init_defaults(self):
         """Provider should initialize with default settings."""
@@ -18,14 +21,11 @@ class TestLLMProvider:
         assert "11434" in provider.base_url
         assert provider.model is not None
 
-    def test_unknown_provider(self):
+    async def test_unknown_provider(self):
         """Unknown provider should return an error."""
         provider = LLMProvider()
         provider.provider = "unknown_provider"
 
-        import asyncio
-        result = asyncio.get_event_loop().run_until_complete(
-            provider.generate("test prompt")
-        )
+        result = await provider.generate("test prompt")
         assert result.ok is False
         assert "Unknown provider" in result.error

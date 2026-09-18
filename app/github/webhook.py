@@ -1,17 +1,18 @@
 """GitHub webhook handler — receives, verifies, and dispatches webhook events."""
+
 import hashlib
 import hmac
 import logging
-from typing import Optional
 
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+
 def verify_webhook_signature(
     payload_body: bytes,
-    signature_header: Optional[str],
-    secret: Optional[str] = None,
+    signature_header: str | None,
+    secret: str | None = None,
 ) -> bool:
     """Verify the GitHub webhook signature (HMAC SHA-256)."""
     settings = get_settings()
@@ -47,9 +48,11 @@ def verify_webhook_signature(
     # Constant-time comparison to prevent timing attacks
     return hmac.compare_digest(computed, expected_signature)
 
+
 SUPPORTED_EVENTS = {"pull_request", "ping"}
 
 PR_ACTIONS_TO_ANALYZE = {"opened", "synchronize", "reopened"}
+
 
 def should_analyze_event(event_type: str, payload: dict) -> bool:
     """Determine whether a webhook event should trigger DiffLens analysis."""
@@ -75,6 +78,7 @@ def should_analyze_event(event_type: str, payload: dict) -> bool:
             return False
 
     return True
+
 
 def extract_pr_info(payload: dict) -> dict:
     """Extract essential PR info from a webhook payload."""

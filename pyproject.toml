@@ -1,0 +1,41 @@
+[project]
+name = "difflens"
+version = "1.1.0"
+description = "Code review engine for Python and Java diffs"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["frontend", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "I", "ASYNC"]
+# B008: FastAPI's Depends()/Query() in parameter defaults is the documented style.
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# Alembic env.py must configure the URL before importing the models.
+"alembic/env.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+python_classes = ["Test*"]
+addopts = "-q --tb=short"
+asyncio_mode = "auto"
+filterwarnings = ["error::DeprecationWarning:app"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/ml/artifacts/*"]
+
+[tool.coverage.report]
+show_missing = false
+skip_covered = false
+precision = 1

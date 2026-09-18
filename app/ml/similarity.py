@@ -1,14 +1,16 @@
 """Similar Bug Detection — embedding-based search for historically similar issues."""
+
 import logging
+from dataclasses import asdict, dataclass
+
 import numpy as np
-from dataclasses import dataclass, asdict
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # Try to import sentence-transformers (heavy dependency, optional)
 try:
     from sentence_transformers import SentenceTransformer
+
     SBERT_AVAILABLE = True
 except ImportError:
     SBERT_AVAILABLE = False
@@ -17,31 +19,36 @@ except ImportError:
 try:
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine
+
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
 
+
 @dataclass
 class SimilarFinding:
     """A historically similar finding."""
+
     message: str
     file_path: str
     analyzer: str
     severity: str
     similarity_score: float
-    run_id: Optional[str] = None
-    suggestion: Optional[str] = None
+    run_id: str | None = None
+    suggestion: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
 
+
 @dataclass
 class SimilarityResult:
     """Result of searching for similar past findings."""
+
     query_message: str
     similar_findings: list[SimilarFinding]
     method: str  # "sbert", "tfidf", or "unavailable"
-    error: Optional[str] = None
+    error: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -50,6 +57,7 @@ class SimilarityResult:
             "method": self.method,
             "error": self.error,
         }
+
 
 class FindingEmbedder:
     """Manages embedding computation and similarity search."""
@@ -89,7 +97,7 @@ class FindingEmbedder:
         ]
         return " ".join(p for p in parts if p)
 
-    def add_findings(self, findings: list[dict], run_id: Optional[str] = None):
+    def add_findings(self, findings: list[dict], run_id: str | None = None):
         """Add findings to the corpus for future similarity searches."""
         for f in findings:
             entry = {**f, "run_id": run_id}
@@ -121,7 +129,9 @@ class FindingEmbedder:
             self._tfidf = TfidfVectorizer(max_features=5000, stop_words="english")
             self._corpus_embeddings = self._tfidf.fit_transform(self._corpus_texts)
 
-    def find_similar(self, finding: dict, top_k: int = 5, threshold: float = 0.3) -> SimilarityResult:
+    def find_similar(
+        self, finding: dict, top_k: int = 5, threshold: float = 0.3
+    ) -> SimilarityResult:
         """Find findings similar to the given one from the stored corpus."""
         query_text = self._finding_to_text(finding)
 
@@ -153,8 +163,7 @@ class FindingEmbedder:
                 norms_corpus = np.maximum(norms_corpus, 1e-10)
                 norms_query = np.maximum(norms_query, 1e-10)
                 similarities = (
-                    (query_emb @ self._corpus_embeddings.T)
-                    / (norms_query * norms_corpus.T)
+                    (query_emb @ self._corpus_embeddings.T) / (norms_query * norms_corpus.T)
                 )[0]
             else:
                 # TF-IDF + cosine
@@ -174,15 +183,17 @@ class FindingEmbedder:
                     continue
 
                 entry = self._corpus[idx]
-                results.append(SimilarFinding(
-                    message=entry.get("message", ""),
-                    file_path=entry.get("file_path", ""),
-                    analyzer=entry.get("analyzer", ""),
-                    severity=entry.get("severity", ""),
-                    similarity_score=round(sim, 4),
-                    run_id=entry.get("run_id"),
-                    suggestion=entry.get("suggestion"),
-                ))
+                results.append(
+                    SimilarFinding(
+                        message=entry.get("message", ""),
+                        file_path=entry.get("file_path", ""),
+                        analyzer=entry.get("analyzer", ""),
+                        severity=entry.get("severity", ""),
+                        similarity_score=round(sim, 4),
+                        run_id=entry.get("run_id"),
+                        suggestion=entry.get("suggestion"),
+                    )
+                )
 
             return SimilarityResult(
                 query_message=finding.get("message", ""),
@@ -206,8 +217,10 @@ class FindingEmbedder:
         self._corpus_embeddings = None
         self._tfidf = None
 
+
 # Module-level singleton
-_embedder: Optional[FindingEmbedder] = None
+_embedder: FindingEmbedder | None = None
+
 
 def get_embedder() -> FindingEmbedder:
     global _embedder

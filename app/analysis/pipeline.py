@@ -1,27 +1,29 @@
 """Analysis pipeline — the main orchestrator."""
-from dataclasses import dataclass, field, asdict
-from typing import Optional
 
-from app.analysis.diff_parser import parse_diff, is_unified_diff, wrap_raw_code
-from app.analysis.complexity import analyze_complexity
-from app.analysis.naming import check_python_naming, check_java_naming
+from dataclasses import asdict, dataclass, field
+
 from app.analysis.bug_risk import detect_bug_risks
-from app.ml.risk_scoring import score_risk
+from app.analysis.complexity import analyze_complexity
+from app.analysis.diff_parser import is_unified_diff, parse_diff, wrap_raw_code
+from app.analysis.naming import check_java_naming, check_python_naming
 from app.ml.categorization import categorize_findings
+from app.ml.risk_scoring import score_risk
 from app.ml.similarity import get_embedder
+
 
 @dataclass
 class AnalysisResult:
     """Complete output from an analysis run."""
+
     files_analyzed: int = 0
     total_findings: int = 0
     complexity_findings: list[dict] = field(default_factory=list)
     naming_findings: list[dict] = field(default_factory=list)
     bug_risk_findings: list[dict] = field(default_factory=list)
     summary: dict = field(default_factory=dict)
-    risk_score: Optional[dict] = None
-    categorization: Optional[dict] = None
-    similar_findings: Optional[list[dict]] = None
+    risk_score: dict | None = None
+    categorization: dict | None = None
+    similar_findings: list[dict] | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -35,6 +37,7 @@ class AnalysisResult:
             "categorization": self.categorization,
             "similar_findings": self.similar_findings,
         }
+
 
 def run_analysis(diff_text: str, enable_ml: bool = True) -> AnalysisResult:
     """Run the full analysis pipeline."""
@@ -93,6 +96,7 @@ def run_analysis(diff_text: str, enable_ml: bool = True) -> AnalysisResult:
 
     return result
 
+
 def _run_ml_modules(result: AnalysisResult, file_diffs) -> None:
     """Run ML modules and attach results. Each is wrapped in try/except
     so a failure in one doesn't block the others."""
@@ -127,6 +131,7 @@ def _run_ml_modules(result: AnalysisResult, file_diffs) -> None:
     except Exception as e:
         result.similar_findings = [{"error": str(e)}]
 
+
 def _flatten_findings(result: AnalysisResult) -> list[dict]:
     """Flatten all findings into a uniform list for ML module input."""
     flat = []
@@ -137,12 +142,14 @@ def _flatten_findings(result: AnalysisResult) -> list[dict]:
     ]
     for findings, analyzer in mapping:
         for f in findings:
-            flat.append({
-                "message": f.get("message", ""),
-                "file_path": f.get("file_path", ""),
-                "line_number": f.get("line_number"),
-                "severity": f.get("severity", "info"),
-                "analyzer": analyzer,
-                "suggestion": f.get("suggestion"),
-            })
+            flat.append(
+                {
+                    "message": f.get("message", ""),
+                    "file_path": f.get("file_path", ""),
+                    "line_number": f.get("line_number"),
+                    "severity": f.get("severity", "info"),
+                    "analyzer": analyzer,
+                    "suggestion": f.get("suggestion"),
+                }
+            )
     return flat

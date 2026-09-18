@@ -1,5 +1,7 @@
 """Tests for naming convention validators."""
-from app.analysis.naming import check_python_naming, check_java_naming
+
+from app.analysis.naming import check_java_naming, check_python_naming
+
 
 class TestPythonNaming:
     def test_bad_class_name(self):
@@ -36,6 +38,7 @@ class TestPythonNaming:
         findings = check_python_naming(code, "test.py")
         assert len(findings) == 0
 
+
 class TestJavaNaming:
     def test_bad_method_name(self):
         code = "public void Process_Data(String x) {\n}\n"
@@ -52,7 +55,7 @@ class TestJavaNaming:
         assert len(method_findings) == 0
 
     def test_bad_constant(self):
-        code = "static final String appName = \"test\";\n"
+        code = 'static final String appName = "test";\n'
         findings = check_java_naming(code, "Test.java")
         const_findings = [f for f in findings if f.kind == "constant"]
         assert len(const_findings) == 1

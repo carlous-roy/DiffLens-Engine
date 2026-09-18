@@ -1,18 +1,21 @@
 """Bug risk detector that identifies common patterns likely to be bugs."""
-from dataclasses import dataclass
-from typing import Optional
+
 import re
+from dataclasses import dataclass
+
 
 @dataclass
 class BugRiskFinding:
     """A potential bug risk identified in the code."""
+
     rule_id: str
     line_number: int
     file_path: str
     severity: str
     message: str
-    suggestion: Optional[str] = None
-    matched_text: Optional[str] = None
+    suggestion: str | None = None
+    matched_text: str | None = None
+
 
 # Python bug risk patterns
 PYTHON_PATTERNS: list[dict] = [
@@ -20,7 +23,9 @@ PYTHON_PATTERNS: list[dict] = [
         "rule_id": "PY001",
         "pattern": re.compile(r"\bexcept\s*:\s*$"),
         "severity": "warning",
-        "message": "Bare except clause catches all exceptions including SystemExit and KeyboardInterrupt.",
+        "message": (
+            "Bare except clause catches all exceptions including SystemExit and KeyboardInterrupt."
+        ),
         "suggestion": "Use 'except Exception:' or catch specific exceptions.",
     },
     {
@@ -34,7 +39,9 @@ PYTHON_PATTERNS: list[dict] = [
         "rule_id": "PY003",
         "pattern": re.compile(r"def\s+\w+\s*\([^)]*=\s*(\[\]|\{\}|\(\))"),
         "severity": "error",
-        "message": "Mutable default argument detected. Default mutable arguments are shared between calls.",
+        "message": (
+            "Mutable default argument detected. Default mutable arguments are shared between calls."
+        ),
         "suggestion": "Use None as default and initialize inside the function body.",
     },
     {
@@ -69,7 +76,9 @@ PYTHON_PATTERNS: list[dict] = [
         "pattern": re.compile(r"\beval\s*\(|\bexec\s*\("),
         "severity": "critical",
         "message": "Use of eval()/exec() is a security risk.",
-        "suggestion": "Use ast.literal_eval() for safe evaluation or refactor to avoid dynamic execution.",
+        "suggestion": (
+            "Use ast.literal_eval() for safe evaluation or refactor to avoid dynamic execution."
+        ),
     },
     {
         "rule_id": "PY009",
@@ -91,7 +100,7 @@ JAVA_PATTERNS: list[dict] = [
     },
     {
         "rule_id": "JV002",
-        "pattern": re.compile(r'catch\s*\(\s*Exception\s+\w+\s*\)\s*\{\s*\}'),
+        "pattern": re.compile(r"catch\s*\(\s*Exception\s+\w+\s*\)\s*\{\s*\}"),
         "severity": "warning",
         "message": "Empty catch block silently swallows exceptions.",
         "suggestion": "Log the exception or rethrow it.",
@@ -126,6 +135,7 @@ JAVA_PATTERNS: list[dict] = [
     },
 ]
 
+
 def detect_bug_risks(
     lines: list[tuple[int, str]],
     file_path: str,
@@ -145,14 +155,16 @@ def detect_bug_risks(
         for pat in patterns:
             match = pat["pattern"].search(content)
             if match:
-                findings.append(BugRiskFinding(
-                    rule_id=pat["rule_id"],
-                    line_number=line_num,
-                    file_path=file_path,
-                    severity=pat["severity"],
-                    message=pat["message"],
-                    suggestion=pat.get("suggestion"),
-                    matched_text=match.group(0),
-                ))
+                findings.append(
+                    BugRiskFinding(
+                        rule_id=pat["rule_id"],
+                        line_number=line_num,
+                        file_path=file_path,
+                        severity=pat["severity"],
+                        message=pat["message"],
+                        suggestion=pat.get("suggestion"),
+                        matched_text=match.group(0),
+                    )
+                )
 
     return findings

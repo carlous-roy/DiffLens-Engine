@@ -1,25 +1,26 @@
 """GitHub webhook and integration API routes."""
+
 import logging
 
-from fastapi import APIRouter, Request, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
-from app.db.models import GitHubPR, AnalysisRun
-from app.github.webhook import (
-    verify_webhook_signature,
-    should_analyze_event,
-    extract_pr_info,
-)
-from app.github.pr_analyzer import analyze_pull_request
+from app.db.models import AnalysisRun, GitHubPR
 from app.github.client import GitHubClient
+from app.github.pr_analyzer import analyze_pull_request
+from app.github.webhook import (
+    extract_pr_info,
+    should_analyze_event,
+    verify_webhook_signature,
+)
 
 logger = logging.getLogger(__name__)
 
 github_router = APIRouter(prefix="/github", tags=["github"])
+
 
 @github_router.post("/webhook")
 async def receive_webhook(
@@ -41,8 +42,8 @@ async def receive_webhook(
 
     try:
         payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON payload.")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload.") from e
 
     logger.info(f"Webhook received: event={event_type}, delivery={delivery_id}")
 
@@ -59,7 +60,7 @@ async def receive_webhook(
         return {
             "status": "skipped",
             "message": f"Event type '{event_type}' with action "
-                       f"'{payload.get('action', 'n/a')}' does not require analysis.",
+            f"'{payload.get('action', 'n/a')}' does not require analysis.",
         }
 
     # Extract PR info and queue analysis
@@ -88,12 +89,15 @@ async def receive_webhook(
         },
     }
 
+
 class AnalyzePRRequest(BaseModel):
     """Request to manually analyze a GitHub PR."""
+
     owner: str = Field(..., description="Repository owner (user or org)")
     repo: str = Field(..., description="Repository name")
     number: int = Field(..., description="PR number")
-    token: Optional[str] = Field(None, description="GitHub token override (optional)")
+    token: str | None = Field(None, description="GitHub token override (optional)")
+
 
 @github_router.post("/analyze-pr")
 async def trigger_pr_analysis(
@@ -114,7 +118,7 @@ async def trigger_pr_analysis(
         client = GitHubClient(token=token)
         pr = await client.get_pr(request.owner, request.repo, request.number)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch PR: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch PR: {e}") from e
 
     background_tasks.add_task(
         analyze_pull_request,
@@ -135,6 +139,7 @@ async def trigger_pr_analysis(
             "sha": pr.head_sha[:8],
         },
     }
+
 
 @github_router.get("/status")
 async def github_status():
@@ -166,18 +171,15 @@ async def github_status():
 
     return status
 
+
 @github_router.get("/prs")
 def list_analyzed_prs(
     limit: int = 20,
-    repo: Optional[str] = None,
+    repo: str | None = None,
     db: Session = Depends(get_db),
 ):
     """List GitHub PRs that have been analyzed by DiffLens."""
-    query = (
-        db.query(GitHubPR)
-        .join(AnalysisRun)
-        .order_by(GitHubPR.created_at.desc())
-    )
+    query = db.query(GitHubPR).join(AnalysisRun).order_by(GitHubPR.created_at.desc())
 
     if repo:
         # Filter by "owner/repo" format

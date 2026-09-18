@@ -1,13 +1,16 @@
 """Auto-categorization — classifies findings by impact category."""
-import re
+
 import logging
-from dataclasses import dataclass, asdict
+import re
+from dataclasses import asdict, dataclass
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class CategorizedFinding:
     """A finding with its assigned category and confidence."""
+
     original_message: str
     category: str  # security, correctness, performance, maintainability, style
     confidence: float  # 0.0 to 1.0
@@ -18,9 +21,11 @@ class CategorizedFinding:
     def to_dict(self) -> dict:
         return asdict(self)
 
+
 @dataclass
 class CategorizationResult:
     """Result of auto-categorizing a set of findings."""
+
     categorized: list[CategorizedFinding]
     summary: dict  # count per category
     method: str  # "keyword" or "llm"
@@ -32,56 +37,77 @@ class CategorizationResult:
             "method": self.method,
         }
 
+
 # Keyword-based classification rules
 # Each rule: (category, confidence, list of patterns)
 CLASSIFICATION_RULES = [
     # Security
-    ("security", 0.95, [
-        re.compile(r"eval\(\)|exec\(\)", re.IGNORECASE),
-        re.compile(r"security risk", re.IGNORECASE),
-        re.compile(r"injection", re.IGNORECASE),
-        re.compile(r"unsafe|insecure", re.IGNORECASE),
-        re.compile(r"sql.*injection|xss|csrf", re.IGNORECASE),
-        re.compile(r"hardcoded.*(password|secret|token)", re.IGNORECASE),
-    ]),
+    (
+        "security",
+        0.95,
+        [
+            re.compile(r"eval\(\)|exec\(\)", re.IGNORECASE),
+            re.compile(r"security risk", re.IGNORECASE),
+            re.compile(r"injection", re.IGNORECASE),
+            re.compile(r"unsafe|insecure", re.IGNORECASE),
+            re.compile(r"sql.*injection|xss|csrf", re.IGNORECASE),
+            re.compile(r"hardcoded.*(password|secret|token)", re.IGNORECASE),
+        ],
+    ),
     # Correctness
-    ("correctness", 0.90, [
-        re.compile(r"mutable default", re.IGNORECASE),
-        re.compile(r"\.equals\(null\)", re.IGNORECASE),
-        re.compile(r"== None|is None", re.IGNORECASE),
-        re.compile(r"string comparison using", re.IGNORECASE),
-        re.compile(r"bare except|silently swallowed", re.IGNORECASE),
-        re.compile(r"null pointer|null reference", re.IGNORECASE),
-        re.compile(r"off.by.one|index.*bound", re.IGNORECASE),
-        re.compile(r"always returns false", re.IGNORECASE),
-    ]),
+    (
+        "correctness",
+        0.90,
+        [
+            re.compile(r"mutable default", re.IGNORECASE),
+            re.compile(r"\.equals\(null\)", re.IGNORECASE),
+            re.compile(r"== None|is None", re.IGNORECASE),
+            re.compile(r"string comparison using", re.IGNORECASE),
+            re.compile(r"bare except|silently swallowed", re.IGNORECASE),
+            re.compile(r"null pointer|null reference", re.IGNORECASE),
+            re.compile(r"off.by.one|index.*bound", re.IGNORECASE),
+            re.compile(r"always returns false", re.IGNORECASE),
+        ],
+    ),
     # Performance
-    ("performance", 0.85, [
-        re.compile(r"complexity of \d{2,}", re.IGNORECASE),  # 2+ digit complexity
-        re.compile(r"O\(n\^2\)|quadratic|exponential", re.IGNORECASE),
-        re.compile(r"memory leak|resource leak", re.IGNORECASE),
-        re.compile(r"unnecessary.*loop|redundant.*iteration", re.IGNORECASE),
-        re.compile(r"cach(e|ing)", re.IGNORECASE),
-    ]),
+    (
+        "performance",
+        0.85,
+        [
+            re.compile(r"complexity of \d{2,}", re.IGNORECASE),  # 2+ digit complexity
+            re.compile(r"O\(n\^2\)|quadratic|exponential", re.IGNORECASE),
+            re.compile(r"memory leak|resource leak", re.IGNORECASE),
+            re.compile(r"unnecessary.*loop|redundant.*iteration", re.IGNORECASE),
+            re.compile(r"cach(e|ing)", re.IGNORECASE),
+        ],
+    ),
     # Maintainability
-    ("maintainability", 0.85, [
-        re.compile(r"refactor", re.IGNORECASE),
-        re.compile(r"cyclomatic complexity", re.IGNORECASE),
-        re.compile(r"global.*keyword|global state", re.IGNORECASE),
-        re.compile(r"wildcard import", re.IGNORECASE),
-        re.compile(r"TODO|FIXME|HACK|XXX", re.IGNORECASE),
-        re.compile(r"too (long|complex|large)", re.IGNORECASE),
-        re.compile(r"dead code|unused", re.IGNORECASE),
-        re.compile(r"consider using a (class|function|method)", re.IGNORECASE),
-    ]),
+    (
+        "maintainability",
+        0.85,
+        [
+            re.compile(r"refactor", re.IGNORECASE),
+            re.compile(r"cyclomatic complexity", re.IGNORECASE),
+            re.compile(r"global.*keyword|global state", re.IGNORECASE),
+            re.compile(r"wildcard import", re.IGNORECASE),
+            re.compile(r"TODO|FIXME|HACK|XXX", re.IGNORECASE),
+            re.compile(r"too (long|complex|large)", re.IGNORECASE),
+            re.compile(r"dead code|unused", re.IGNORECASE),
+            re.compile(r"consider using a (class|function|method)", re.IGNORECASE),
+        ],
+    ),
     # Style
-    ("style", 0.90, [
-        re.compile(r"snake_case|camelCase|PascalCase|SCREAMING_SNAKE", re.IGNORECASE),
-        re.compile(r"naming convention", re.IGNORECASE),
-        re.compile(r"should use.*Case", re.IGNORECASE),
-        re.compile(r"rename to", re.IGNORECASE),
-        re.compile(r"logging framework|System\.out", re.IGNORECASE),
-    ]),
+    (
+        "style",
+        0.90,
+        [
+            re.compile(r"snake_case|camelCase|PascalCase|SCREAMING_SNAKE", re.IGNORECASE),
+            re.compile(r"naming convention", re.IGNORECASE),
+            re.compile(r"should use.*Case", re.IGNORECASE),
+            re.compile(r"rename to", re.IGNORECASE),
+            re.compile(r"logging framework|System\.out", re.IGNORECASE),
+        ],
+    ),
 ]
 
 # Analyzer-to-default-category mapping (fallback)
@@ -90,6 +116,7 @@ ANALYZER_DEFAULTS = {
     "naming": ("style", 0.8),
     "bug_risk": ("correctness", 0.6),
 }
+
 
 def _classify_single(message: str, analyzer: str, severity: str) -> tuple[str, float, str]:
     """Classify a single finding message."""
@@ -117,6 +144,7 @@ def _classify_single(message: str, analyzer: str, severity: str) -> tuple[str, f
     default_cat, default_conf = ANALYZER_DEFAULTS.get(analyzer, ("maintainability", 0.5))
     return default_cat, default_conf, f"Default category for '{analyzer}' analyzer"
 
+
 def categorize_findings(findings: list[dict]) -> CategorizationResult:
     """Auto-categorize a list of findings."""
     categorized = []
@@ -136,14 +164,16 @@ def categorize_findings(findings: list[dict]) -> CategorizationResult:
         category, confidence, reasoning = _classify_single(message, analyzer, severity)
         category_counts[category] = category_counts.get(category, 0) + 1
 
-        categorized.append(CategorizedFinding(
-            original_message=message,
-            category=category,
-            confidence=confidence,
-            reasoning=reasoning,
-            analyzer=analyzer,
-            severity=severity,
-        ))
+        categorized.append(
+            CategorizedFinding(
+                original_message=message,
+                category=category,
+                confidence=confidence,
+                reasoning=reasoning,
+                analyzer=analyzer,
+                severity=severity,
+            )
+        )
 
     return CategorizationResult(
         categorized=categorized,

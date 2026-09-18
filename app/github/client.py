@@ -1,7 +1,7 @@
 """GitHub REST API client for DiffLens."""
+
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 import httpx
 
@@ -11,9 +11,11 @@ logger = logging.getLogger(__name__)
 
 GITHUB_API_BASE = "https://api.github.com"
 
+
 @dataclass
 class PRInfo:
     """Extracted pull request metadata."""
+
     owner: str
     repo: str
     number: int
@@ -27,16 +29,15 @@ class PRInfo:
     deletions: int = 0
     changed_files: int = 0
 
+
 class GitHubClient:
     """Async client for GitHub REST API v3."""
 
-    def __init__(self, token: Optional[str] = None):
+    def __init__(self, token: str | None = None):
         settings = get_settings()
         self.token = token or settings.github_token
         if not self.token:
-            raise ValueError(
-                "GitHub token is required. Set GITHUB_TOKEN environment variable."
-            )
+            raise ValueError("GitHub token is required. Set GITHUB_TOKEN environment variable.")
         self._headers = {
             "Authorization": f"token {self.token}",
             "Accept": "application/vnd.github.v3+json",
@@ -99,7 +100,7 @@ class GitHubClient:
         sha: str,
         state: str,
         description: str,
-        target_url: Optional[str] = None,
+        target_url: str | None = None,
         context: str = "DiffLens",
     ) -> dict:
         """Set a commit status (pending, success, failure, error)."""
@@ -127,7 +128,10 @@ class GitHubClient:
         name: str = "DiffLens Analysis",
         status: str = "in_progress",
     ) -> dict:
-        """Create a GitHub Check Run (requires GitHub App or fine-grained token with checks:write)."""
+        """Create a GitHub Check Run.
+
+        Requires a GitHub App or a fine-grained token with checks:write.
+        """
         payload = {
             "name": name,
             "head_sha": head_sha,
@@ -149,7 +153,7 @@ class GitHubClient:
         conclusion: str,
         title: str,
         summary: str,
-        annotations: Optional[list[dict]] = None,
+        annotations: list[dict] | None = None,
     ) -> dict:
         """Update a check run with conclusion and annotations."""
         output = {"title": title, "summary": summary}
@@ -178,7 +182,7 @@ class GitHubClient:
         commit_id: str,
         body: str,
         event: str = "COMMENT",
-        comments: Optional[list[dict]] = None,
+        comments: list[dict] | None = None,
     ) -> dict:
         """Create a pull request review with optional inline comments."""
         payload = {
@@ -199,8 +203,8 @@ class GitHubClient:
             # comments — the summary comment still covers all findings.
             if resp.status_code == 422 and comments:
                 logger.warning(
-                    f"Inline comments outside diff range (422), "
-                    f"posting review without inline comments."
+                    "Inline comments outside diff range (422), "
+                    "posting review without inline comments."
                 )
                 payload.pop("comments", None)
                 resp = await client.post(

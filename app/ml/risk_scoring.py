@@ -1,23 +1,26 @@
 """Code Change Risk Scoring — feature extraction and risk prediction."""
+
 import logging
-from dataclasses import dataclass, asdict
-from typing import Optional
+from dataclasses import asdict, dataclass
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
 
 try:
+    import joblib
     from sklearn.ensemble import GradientBoostingClassifier
     from sklearn.preprocessing import StandardScaler
-    import joblib
+
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
 
+
 @dataclass
 class RiskFeatures:
     """Feature vector extracted from a diff and its analysis."""
+
     files_changed: int = 0
     total_additions: int = 0
     total_deletions: int = 0
@@ -54,17 +57,30 @@ class RiskFeatures:
             self.churn_ratio,
         ]
 
+
 FEATURE_NAMES = [
-    "files_changed", "total_additions", "total_deletions",
-    "max_file_additions", "total_findings", "critical_findings",
-    "error_findings", "warning_findings", "max_complexity",
-    "avg_complexity", "has_security_issue", "has_mutable_default",
-    "naming_violations", "bug_risk_count", "churn_ratio",
+    "files_changed",
+    "total_additions",
+    "total_deletions",
+    "max_file_additions",
+    "total_findings",
+    "critical_findings",
+    "error_findings",
+    "warning_findings",
+    "max_complexity",
+    "avg_complexity",
+    "has_security_issue",
+    "has_mutable_default",
+    "naming_violations",
+    "bug_risk_count",
+    "churn_ratio",
 ]
+
 
 @dataclass
 class RiskScore:
     """Risk assessment result for a code change."""
+
     level: str  # low, medium, high
     score: float  # 0.0 to 1.0
     confidence: float  # 0.0 to 1.0
@@ -75,7 +91,8 @@ class RiskScore:
     def to_dict(self) -> dict:
         return asdict(self)
 
-def extract_features(analysis_result: dict, file_diffs: Optional[list] = None) -> RiskFeatures:
+
+def extract_features(analysis_result: dict, file_diffs: list | None = None) -> RiskFeatures:
     """Extract ML features from an analysis result and optional raw diffs."""
     features = RiskFeatures()
 
@@ -127,6 +144,7 @@ def extract_features(analysis_result: dict, file_diffs: Optional[list] = None) -
         features.churn_ratio = total_del / (total_add + 1)
 
     return features
+
 
 def _heuristic_score(features: RiskFeatures) -> RiskScore:
     """Heuristic-based risk scoring used before a trained model is available."""
@@ -209,6 +227,7 @@ def _heuristic_score(features: RiskFeatures) -> RiskScore:
         model_type="heuristic",
     )
 
+
 class TrainedRiskModel:
     """Wrapper for a trained scikit-learn model."""
 
@@ -227,7 +246,7 @@ class TrainedRiskModel:
         X_scaled = self.scaler.fit_transform(X)
 
         label_map = {"low": 0, "medium": 1, "high": 2}
-        y = np.array([label_map.get(l, 0) for l in labels])
+        y = np.array([label_map.get(label, 0) for label in labels])
 
         self.model = GradientBoostingClassifier(
             n_estimators=100,
@@ -261,8 +280,7 @@ class TrainedRiskModel:
         for idx in top_indices:
             if importances[idx] > 0.05:
                 factors.append(
-                    f"{FEATURE_NAMES[idx]}={vec[idx]:.1f} "
-                    f"(importance: {importances[idx]:.2f})"
+                    f"{FEATURE_NAMES[idx]}={vec[idx]:.1f} (importance: {importances[idx]:.2f})"
                 )
 
         if not factors:
@@ -292,10 +310,12 @@ class TrainedRiskModel:
         self.scaler = data["scaler"]
         self.is_trained = True
 
-# Module-level trained model (loaded on demand)
-_trained_model: Optional[TrainedRiskModel] = None
 
-def score_risk(analysis_result: dict, file_diffs: Optional[list] = None) -> RiskScore:
+# Module-level trained model (loaded on demand)
+_trained_model: TrainedRiskModel | None = None
+
+
+def score_risk(analysis_result: dict, file_diffs: list | None = None) -> RiskScore:
     """Score the risk of a code change."""
     features = extract_features(analysis_result, file_diffs)
 

@@ -1,5 +1,7 @@
 """Tests for the bug risk detector."""
+
 from app.analysis.bug_risk import detect_bug_risks
+
 
 class TestPythonBugRisks:
     def test_bare_except(self):
@@ -45,6 +47,7 @@ class TestPythonBugRisks:
         findings = detect_bug_risks(lines, "test.py", "python")
         assert len(findings) == 0
 
+
 class TestJavaBugRisks:
     def test_equals_null(self):
         lines = [(10, "if (x.equals(null))")]
@@ -65,6 +68,7 @@ class TestJavaBugRisks:
         lines = [(10, "System.out.println(x);")]
         findings = detect_bug_risks(lines, "Test.java", "java")
         assert any(f.rule_id == "JV004" for f in findings)
+
 
 def test_unsupported_language():
     lines = [(1, "fn main() {}")]

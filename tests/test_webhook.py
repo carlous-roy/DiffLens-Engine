@@ -1,21 +1,20 @@
 """Tests for GitHub webhook verification and event dispatch."""
+
 import hashlib
 import hmac
 
 from app.github.webhook import (
-    verify_webhook_signature,
-    should_analyze_event,
     extract_pr_info,
-    PR_ACTIONS_TO_ANALYZE,
+    should_analyze_event,
+    verify_webhook_signature,
 )
+
 
 class TestWebhookSignature:
     def test_valid_signature(self):
         secret = "webhook-test-value"
         payload = b'{"action": "opened"}'
-        digest = hmac.new(
-            secret.encode(), msg=payload, digestmod=hashlib.sha256
-        ).hexdigest()
+        digest = hmac.new(secret.encode(), msg=payload, digestmod=hashlib.sha256).hexdigest()
         signature = f"sha256={digest}"
 
         assert verify_webhook_signature(payload, signature, secret=secret) is True
@@ -23,25 +22,20 @@ class TestWebhookSignature:
     def test_invalid_signature(self):
         secret = "webhook-test-value"
         payload = b'{"action": "opened"}'
-        assert verify_webhook_signature(
-            payload, "sha256=deadbeef", secret=secret
-        ) is False
+        assert verify_webhook_signature(payload, "sha256=deadbeef", secret=secret) is False
 
     def test_missing_signature_with_secret(self):
-        assert verify_webhook_signature(
-            b"body", None, secret="webhook-test-value"
-        ) is False
+        assert verify_webhook_signature(b"body", None, secret="webhook-test-value") is False
 
     def test_no_secret_configured_rejects(self):
         """Fail closed: with no secret configured nothing can be verified."""
-        assert verify_webhook_signature(
-            b"anything", "sha256=whatever", secret=None
-        ) is False
+        assert verify_webhook_signature(b"anything", "sha256=whatever", secret=None) is False
 
     def test_wrong_prefix(self):
-        assert verify_webhook_signature(
-            b"body", "sha1=abc123", secret="webhook-test-value"
-        ) is False
+        assert (
+            verify_webhook_signature(b"body", "sha1=abc123", secret="webhook-test-value") is False
+        )
+
 
 class TestShouldAnalyze:
     def test_ping_event(self):
@@ -78,6 +72,7 @@ class TestShouldAnalyze:
         # Default setting: analyze_drafts = False
         assert should_analyze_event("pull_request", payload) is False
 
+
 SAMPLE_WEBHOOK_PAYLOAD = {
     "action": "opened",
     "pull_request": {
@@ -96,6 +91,7 @@ SAMPLE_WEBHOOK_PAYLOAD = {
         "full_name": "acme/repo",
     },
 }
+
 
 class TestExtractPRInfo:
     def test_extracts_all_fields(self):

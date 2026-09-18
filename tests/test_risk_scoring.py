@@ -1,5 +1,7 @@
 """Tests for the risk scoring module."""
-from app.ml.risk_scoring import score_risk, extract_features, RiskFeatures
+
+from app.ml.risk_scoring import extract_features, score_risk
+
 
 class TestFeatureExtraction:
     def test_basic_extraction(self):
@@ -11,7 +13,9 @@ class TestFeatureExtraction:
                 "by_analyzer": {"complexity": 3, "naming": 4, "bug_risk": 3},
             },
             "complexity_findings": [
-                {"complexity": 5}, {"complexity": 12}, {"complexity": 3},
+                {"complexity": 5},
+                {"complexity": 12},
+                {"complexity": 3},
             ],
             "naming_findings": [],
             "bug_risk_findings": [
@@ -32,7 +36,8 @@ class TestFeatureExtraction:
     def test_empty_analysis(self):
         analysis = {
             "summary": {
-                "files_analyzed": 0, "total_findings": 0,
+                "files_analyzed": 0,
+                "total_findings": 0,
                 "by_severity": {"info": 0, "warning": 0, "error": 0, "critical": 0},
                 "by_analyzer": {"complexity": 0, "naming": 0, "bug_risk": 0},
             },
@@ -45,11 +50,13 @@ class TestFeatureExtraction:
         assert features.max_complexity == 0
         assert features.has_security_issue is False
 
+
 class TestHeuristicScoring:
     def test_low_risk(self):
         analysis = {
             "summary": {
-                "files_analyzed": 1, "total_findings": 1,
+                "files_analyzed": 1,
+                "total_findings": 1,
                 "by_severity": {"info": 1, "warning": 0, "error": 0, "critical": 0},
                 "by_analyzer": {"complexity": 1, "naming": 0, "bug_risk": 0},
             },
@@ -65,14 +72,16 @@ class TestHeuristicScoring:
     def test_high_risk(self):
         analysis = {
             "summary": {
-                "files_analyzed": 8, "total_findings": 20,
+                "files_analyzed": 8,
+                "total_findings": 20,
                 "by_severity": {"info": 2, "warning": 8, "error": 5, "critical": 5},
                 "by_analyzer": {"complexity": 5, "naming": 5, "bug_risk": 10},
             },
             "complexity_findings": [{"complexity": 25}],
             "naming_findings": [],
             "bug_risk_findings": [
-                {"rule_id": "PY008"}, {"rule_id": "PY008"},
+                {"rule_id": "PY008"},
+                {"rule_id": "PY008"},
             ],
         }
         risk = score_risk(analysis)
@@ -82,7 +91,8 @@ class TestHeuristicScoring:
     def test_contributing_factors_present(self):
         analysis = {
             "summary": {
-                "files_analyzed": 1, "total_findings": 3,
+                "files_analyzed": 1,
+                "total_findings": 3,
                 "by_severity": {"info": 0, "warning": 0, "error": 0, "critical": 3},
                 "by_analyzer": {"complexity": 0, "naming": 0, "bug_risk": 3},
             },
@@ -96,7 +106,8 @@ class TestHeuristicScoring:
     def test_score_in_valid_range(self):
         analysis = {
             "summary": {
-                "files_analyzed": 100, "total_findings": 500,
+                "files_analyzed": 100,
+                "total_findings": 500,
                 "by_severity": {"info": 100, "warning": 200, "error": 100, "critical": 100},
                 "by_analyzer": {"complexity": 200, "naming": 100, "bug_risk": 200},
             },
@@ -110,7 +121,8 @@ class TestHeuristicScoring:
     def test_features_in_result(self):
         analysis = {
             "summary": {
-                "files_analyzed": 2, "total_findings": 5,
+                "files_analyzed": 2,
+                "total_findings": 5,
                 "by_severity": {"info": 3, "warning": 2, "error": 0, "critical": 0},
                 "by_analyzer": {"complexity": 2, "naming": 2, "bug_risk": 1},
             },

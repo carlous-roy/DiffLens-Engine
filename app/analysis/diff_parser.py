@@ -1,11 +1,13 @@
 """Unified diff parser and raw code auto-wrapping."""
-from dataclasses import dataclass, field
-from typing import Optional
+
 import re
+from dataclasses import dataclass, field
+
 
 @dataclass
 class DiffHunk:
     """A single hunk (contiguous changed region) in a diff."""
+
     old_start: int
     old_count: int
     new_start: int
@@ -42,11 +44,13 @@ class DiffHunk:
                 current_line += 1
         return results
 
+
 @dataclass
 class FileDiff:
     """All changes to a single file within a diff."""
-    old_path: Optional[str]
-    new_path: Optional[str]
+
+    old_path: str | None
+    new_path: str | None
     hunks: list[DiffHunk] = field(default_factory=list)
     is_new_file: bool = False
     is_deleted_file: bool = False
@@ -57,12 +61,18 @@ class FileDiff:
         return self.new_path or self.old_path or "unknown"
 
     @property
-    def language(self) -> Optional[str]:
+    def language(self) -> str | None:
         """Infer language from file extension."""
         ext_map = {
-            ".py": "python", ".java": "java", ".js": "javascript",
-            ".ts": "typescript", ".go": "go", ".rs": "rust",
-            ".cpp": "cpp", ".c": "c", ".rb": "ruby",
+            ".py": "python",
+            ".java": "java",
+            ".js": "javascript",
+            ".ts": "typescript",
+            ".go": "go",
+            ".rs": "rust",
+            ".cpp": "cpp",
+            ".c": "c",
+            ".rb": "ruby",
         }
         for ext, lang in ext_map.items():
             if self.path.endswith(ext):
@@ -78,15 +88,17 @@ class FileDiff:
                 lines.append(content)
         return "\n".join(lines)
 
+
 # Diff parser
 
 HUNK_HEADER_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 
+
 def parse_diff(diff_text: str) -> list[FileDiff]:
     """Parse a unified diff string into FileDiff objects."""
     files: list[FileDiff] = []
-    current_file: Optional[FileDiff] = None
-    current_hunk: Optional[DiffHunk] = None
+    current_file: FileDiff | None = None
+    current_hunk: DiffHunk | None = None
 
     lines = diff_text.split("\n")
     i = 0
@@ -173,6 +185,7 @@ def parse_diff(diff_text: str) -> list[FileDiff]:
 
     return files
 
+
 # Raw code auto-detection and wrapping
 
 # Regex patterns to identify code by language
@@ -194,10 +207,17 @@ _LANG_HINTS = {
 }
 
 _LANG_EXT = {
-    "python": ".py", "java": ".java", "javascript": ".js",
-    "typescript": ".ts", "go": ".go", "rust": ".rs",
-    "cpp": ".cpp", "c": ".c", "ruby": ".rb",
+    "python": ".py",
+    "java": ".java",
+    "javascript": ".js",
+    "typescript": ".ts",
+    "go": ".go",
+    "rust": ".rs",
+    "cpp": ".cpp",
+    "c": ".c",
+    "ruby": ".rb",
 }
+
 
 def _guess_language(code: str) -> str:
     """Guess programming language from code content."""
@@ -210,6 +230,7 @@ def _guess_language(code: str) -> str:
     best = max(scores, key=scores.get)
     return best if scores[best] > 0 else "python"
 
+
 def is_unified_diff(text: str) -> bool:
     """Check whether the input looks like a unified diff."""
     lines = text.strip().split("\n")
@@ -220,7 +241,8 @@ def is_unified_diff(text: str) -> bool:
             return True
     return False
 
-def wrap_raw_code(code: str, filename: Optional[str] = None) -> str:
+
+def wrap_raw_code(code: str, filename: str | None = None) -> str:
     """Wrap raw code into a synthetic unified diff."""
     lang = _guess_language(code)
     ext = _LANG_EXT.get(lang, ".py")

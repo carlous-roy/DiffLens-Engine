@@ -1,6 +1,8 @@
 """Tests for the analysis pipeline."""
+
 from app.analysis.pipeline import run_analysis
-from tests.conftest import SAMPLE_PYTHON_DIFF, MINIMAL_PYTHON_DIFF, SAMPLE_JAVA_DIFF
+from tests.conftest import MINIMAL_PYTHON_DIFF, SAMPLE_JAVA_DIFF, SAMPLE_PYTHON_DIFF
+
 
 def test_pipeline_python_diff():
     """End-to-end pipeline test with ML enabled."""
@@ -26,15 +28,18 @@ def test_pipeline_python_diff():
     # Risk should be medium or high for this buggy code
     assert result.risk_score["level"] in ("medium", "high")
 
+
 def test_pipeline_java_diff():
     result = run_analysis(SAMPLE_JAVA_DIFF, enable_ml=True)
     assert result.risk_score is not None
     assert result.categorization is not None
 
+
 def test_pipeline_clean_code():
     result = run_analysis(MINIMAL_PYTHON_DIFF, enable_ml=True)
     assert result.risk_score is not None
     assert result.risk_score["level"] == "low"
+
 
 def test_pipeline_ml_disabled():
     """ML modules should not run when disabled."""
@@ -46,25 +51,29 @@ def test_pipeline_ml_disabled():
     # Static analysis still works
     assert result.total_findings > 0
 
+
 def test_pipeline_categorization_covers_all_findings():
     """All findings should be categorized."""
     result = run_analysis(SAMPLE_PYTHON_DIFF, enable_ml=True)
     total_static = (
-        len(result.complexity_findings) +
-        len(result.naming_findings) +
-        len(result.bug_risk_findings)
+        len(result.complexity_findings)
+        + len(result.naming_findings)
+        + len(result.bug_risk_findings)
     )
     categorized_count = len(result.categorization["categorized"])
     assert categorized_count == total_static
+
 
 def test_pipeline_risk_has_factors():
     result = run_analysis(SAMPLE_PYTHON_DIFF, enable_ml=True)
     assert len(result.risk_score["contributing_factors"]) > 0
 
+
 def test_pipeline_empty_diff():
     result = run_analysis("", enable_ml=True)
     assert result.files_analyzed == 0
     assert result.total_findings == 0
+
 
 def test_pipeline_unsupported_language():
     diff = """diff --git a/style.css b/style.css

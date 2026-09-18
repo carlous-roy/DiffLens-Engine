@@ -1,5 +1,5 @@
 """GitHub output formatter — converts DiffLens results into GitHub-friendly formats."""
-from typing import Optional
+
 from app.analysis.pipeline import AnalysisResult
 
 SEVERITY_EMOJI = {
@@ -16,9 +16,10 @@ SEVERITY_TO_ANNOTATION_LEVEL = {
     "info": "notice",
 }
 
+
 def format_summary_comment(
     analysis: AnalysisResult,
-    smart_review: Optional[dict] = None,
+    smart_review: dict | None = None,
 ) -> str:
     """Format the full analysis result as a GitHub PR comment in Markdown."""
     risk_info = analysis.risk_score or {}
@@ -97,7 +98,9 @@ def format_summary_comment(
         comments = smart_review.get("comments", [])
         if comments:
             for c in comments[:5]:
-                lines.append(f"- **{c.get('file', '')}:{c.get('line', '')}** — {c.get('comment', '')}")
+                lines.append(
+                    f"- **{c.get('file', '')}:{c.get('line', '')}** — {c.get('comment', '')}"
+                )
             lines.append("")
         summary_text = smart_review.get("overall_summary", "")
         if summary_text:
@@ -118,9 +121,13 @@ def format_summary_comment(
             lines.append("")
 
     lines.append("---")
-    lines.append("*Analyzed by [DiffLens](https://github.com/carlous-roy/DiffLens-Engine) · ML-powered code review*")
+    lines.append(
+        "*Analyzed by [DiffLens](https://github.com/carlous-roy/DiffLens-Engine) "
+        "· static analysis and change-risk scoring*"
+    )
 
     return "\n".join(lines)
+
 
 def findings_to_annotations(analysis: AnalysisResult) -> list[dict]:
     """Convert findings into GitHub Check Run annotations."""
@@ -133,21 +140,27 @@ def findings_to_annotations(analysis: AnalysisResult) -> list[dict]:
         if not line:
             continue  # Annotations require a line number
 
-        ranked.append((severity_order.get(severity, 4), {
-            "path": f.get("file_path", ""),
-            "start_line": line,
-            "end_line": line,
-            "annotation_level": SEVERITY_TO_ANNOTATION_LEVEL.get(severity, "notice"),
-            "title": f"[{f.get('analyzer', 'difflens').upper()}] {severity.capitalize()}",
-            "message": f.get("message", ""),
-            "raw_details": f.get("suggestion", ""),
-        }))
+        ranked.append(
+            (
+                severity_order.get(severity, 4),
+                {
+                    "path": f.get("file_path", ""),
+                    "start_line": line,
+                    "end_line": line,
+                    "annotation_level": SEVERITY_TO_ANNOTATION_LEVEL.get(severity, "notice"),
+                    "title": f"[{f.get('analyzer', 'difflens').upper()}] {severity.capitalize()}",
+                    "message": f.get("message", ""),
+                    "raw_details": f.get("suggestion", ""),
+                },
+            )
+        )
 
     # Sort by severity (critical first), then drop the sort key.
     ranked.sort(key=lambda item: item[0])
     annotations = [a for _, a in ranked]
 
     return annotations
+
 
 def findings_to_review_comments(analysis: AnalysisResult) -> list[dict]:
     """Convert high-severity findings into PR review inline comments."""
@@ -177,14 +190,17 @@ def findings_to_review_comments(analysis: AnalysisResult) -> list[dict]:
 
         # GitHub's review API requires `side` and `subject_type` when
         # using absolute line numbers instead of diff hunk positions.
-        comments.append({
-            "path": path,
-            "line": line,
-            "side": "RIGHT",
-            "body": "\n".join(body_parts),
-        })
+        comments.append(
+            {
+                "path": path,
+                "line": line,
+                "side": "RIGHT",
+                "body": "\n".join(body_parts),
+            }
+        )
 
     return comments
+
 
 def risk_level_to_status_state(risk_level: str) -> str:
     """Map DiffLens risk level to GitHub commit status state."""
@@ -196,6 +212,7 @@ def risk_level_to_status_state(risk_level: str) -> str:
     }
     return mapping.get(risk_level.lower(), "success")
 
+
 def risk_level_to_conclusion(risk_level: str) -> str:
     """Map DiffLens risk level to GitHub Check Run conclusion."""
     mapping = {
@@ -206,6 +223,7 @@ def risk_level_to_conclusion(risk_level: str) -> str:
     }
     return mapping.get(risk_level.lower(), "neutral")
 
+
 def _risk_emoji(level: str) -> str:
     mapping = {
         "low": "🟢",
@@ -214,6 +232,7 @@ def _risk_emoji(level: str) -> str:
         "critical": "🔴",
     }
     return mapping.get(level.lower(), "⚪")
+
 
 def _collect_all_findings(analysis: AnalysisResult) -> list[dict]:
     """Collect all findings with analyzer tag."""
@@ -225,6 +244,7 @@ def _collect_all_findings(analysis: AnalysisResult) -> list[dict]:
     for f in analysis.bug_risk_findings:
         findings.append({**f, "analyzer": "bug_risk"})
     return findings
+
 
 def _collect_top_findings(analysis: AnalysisResult, limit: int = 10) -> list[dict]:
     """Collect top findings sorted by severity."""
