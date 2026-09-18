@@ -21,6 +21,8 @@ ignore = ["B008"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app", "tests"]
+# The migrations directory is named after the package; keep the package third-party.
+known-third-party = ["alembic"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

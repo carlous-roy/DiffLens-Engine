@@ -2,6 +2,8 @@
 
 from dataclasses import asdict, dataclass, field
 
+import numpy as np
+
 from app.analysis.bug_risk import detect_bug_risks
 from app.analysis.complexity import analyze_complexity
 from app.analysis.diff_parser import is_unified_diff, parse_diff, wrap_raw_code
@@ -10,7 +12,7 @@ from app.config import get_settings
 from app.ml.categorization import categorize_findings
 from app.ml.change_metrics import AuthorHistory
 from app.ml.risk_scoring import score_risk
-from app.ml.similarity import get_embedder
+from app.ml.similarity import analyze_findings, get_finding_index
 
 
 @dataclass
@@ -26,6 +28,26 @@ class AnalysisResult:
     risk_score: dict | None = None
     categorization: dict | None = None
     similar_findings: list[dict] | None = None
+    # Not serialised: what persistence needs to store the similarity results.
+    finding_vectors: np.ndarray | None = field(default=None, repr=False)
+    finding_cluster_ids: list[int] | None = field(default=None, repr=False)
+    embedding_model: str | None = field(default=None, repr=False)
+
+    def all_findings(self) -> list[dict]:
+        """Every finding with its analyzer tag, in a fixed order.
+
+        The order matters: categorization, embeddings and cluster ids are
+        stored positionally against this list.
+        """
+        flat = []
+        for findings, analyzer in (
+            (self.complexity_findings, "complexity"),
+            (self.naming_findings, "naming"),
+            (self.bug_risk_findings, "bug_risk"),
+        ):
+            for f in findings:
+                flat.append({**f, "analyzer": analyzer})
+        return flat
 
     def to_dict(self) -> dict:
         return {
@@ -113,7 +135,7 @@ def _run_ml_modules(result: AnalysisResult, file_diffs, history: AuthorHistory |
     results. Each is wrapped in try/except so a failure in one does not block
     the others."""
     settings = get_settings()
-    all_flat = _flatten_findings(result)
+    all_flat = result.all_findings()
 
     # Risk scoring: calibrated model probability combined with the findings
     if settings.ml_enable_risk_scoring:
@@ -131,43 +153,30 @@ def _run_ml_modules(result: AnalysisResult, file_diffs, history: AuthorHistory |
         except Exception as e:
             result.categorization = {"error": str(e)}
 
-    if not settings.ml_enable_similarity:
+    if not settings.ml_enable_similarity or not all_flat:
         return
 
-    # Similarity search: related past findings
+    # Similarity search and clustering: related past findings, repeat clusters
     try:
-        embedder = get_embedder()
-        similar_results = []
-        high_sev = [f for f in all_flat if f.get("severity") in ("error", "critical")]
-        for finding in high_sev[:5]:
-            sim = embedder.find_similar(finding, top_k=3, threshold=0.3)
-            if sim.similar_findings:
-                similar_results.append(sim.to_dict())
-        result.similar_findings = similar_results if similar_results else None
-        # Add current findings to the corpus for future lookups
-        embedder.add_findings(all_flat)
+        index = get_finding_index()
+        analysis = analyze_findings(all_flat, index)
+        originals = _finding_refs(result)
+        seen_before = 0
+        for original, sim_result in zip(originals, analysis.results, strict=True):
+            original["cluster_id"] = sim_result.cluster_id
+            original["times_seen_before"] = sim_result.times_seen_before
+            if sim_result.times_seen_before:
+                seen_before += 1
+        result.summary["findings_seen_before"] = seen_before
+        with_hits = [r.to_dict() for r in analysis.results if r.similar_findings]
+        result.similar_findings = with_hits or None
+        result.finding_vectors = analysis.vectors
+        result.finding_cluster_ids = analysis.cluster_ids
+        result.embedding_model = index.model.name
     except Exception as e:
         result.similar_findings = [{"error": str(e)}]
 
 
-def _flatten_findings(result: AnalysisResult) -> list[dict]:
-    """Flatten all findings into a uniform list for ML module input."""
-    flat = []
-    mapping = [
-        (result.complexity_findings, "complexity"),
-        (result.naming_findings, "naming"),
-        (result.bug_risk_findings, "bug_risk"),
-    ]
-    for findings, analyzer in mapping:
-        for f in findings:
-            flat.append(
-                {
-                    "message": f.get("message", ""),
-                    "file_path": f.get("file_path", ""),
-                    "line_number": f.get("line_number"),
-                    "severity": f.get("severity", "info"),
-                    "analyzer": analyzer,
-                    "suggestion": f.get("suggestion"),
-                }
-            )
-    return flat
+def _finding_refs(result: AnalysisResult) -> list[dict]:
+    """The original finding dicts in `all_findings()` order, for writing back."""
+    return [*result.complexity_findings, *result.naming_findings, *result.bug_risk_findings]

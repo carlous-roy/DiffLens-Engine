@@ -1,9 +1,8 @@
 import os
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
-
 from alembic import context
+from sqlalchemy import engine_from_config, pool
 
 config = context.config
 
@@ -14,7 +13,9 @@ from app.config import get_settings
 database_url = os.environ.get("DATABASE_URL") or get_settings().database_url
 config.set_main_option("sqlalchemy.url", database_url)
 
-if config.config_file_name is not None:
+# The CLI configures logging from alembic.ini; callers that already have
+# logging set up (the app at startup, the tests) pass configure_logger=False.
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
 # Import all models so Alembic can detect them

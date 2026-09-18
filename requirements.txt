@@ -19,6 +19,10 @@ scikit-learn==1.9.1
 numpy==2.4.6
 joblib==1.6.0
 
+# ML - finding embeddings (ONNX, no PyTorch) and the pgvector column type
+fastembed==0.8.0
+pgvector==0.5.0
+
 # ML - Async HTTP for LLM calls
 httpx==0.25.2
 

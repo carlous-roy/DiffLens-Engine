@@ -11,6 +11,7 @@ from app.config import get_settings
 from app.github.routes import github_router
 from app.logging_config import configure_logging
 from app.ml.risk_scoring import load_risk_model
+from app.ml.similarity import get_finding_index
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -19,9 +20,10 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Startup work: load the risk model artefact (loudly reports a fallback)."""
+    """Startup work: load the risk model artefact and the similarity corpus."""
     if load_risk_model() is None:
         logger.error("Risk scoring is running on the heuristic fallback.")
+    get_finding_index().load_from_db()
     yield
 
 

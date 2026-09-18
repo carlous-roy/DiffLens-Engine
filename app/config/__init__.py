@@ -45,6 +45,21 @@ class Settings(BaseSettings):
     ml_enable_similarity: bool = True
     ml_enable_categorization: bool = True
 
+    # Embeddings, similarity search and clustering of findings
+    embedding_backend: str = "fastembed"  # "fastembed" or "hashing"
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    embedding_cache_dir: str | None = None  # where fastembed keeps the ONNX model
+    # Cosine distance under which two findings belong to the same cluster.
+    cluster_distance_threshold: float = 0.15
+    # Findings whose combined (embedding + TF-IDF) similarity is below this are
+    # not reported as related. 0.6 keeps the same issue seen before and drops
+    # different rules that merely share vocabulary, on both backends.
+    similarity_min_score: float = 0.6
+    # Corpus size up to which the whole corpus is re-clustered at startup.
+    similarity_recluster_limit: int = 5000
+    # Most findings loaded into memory at startup (newest first).
+    similarity_corpus_limit: int = 20000
+
     # GitHub integration
     github_token: str | None = None
     github_webhook_secret: str | None = None

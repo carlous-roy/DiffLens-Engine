@@ -8,9 +8,14 @@ talk to GitHub or an LLM is replaced with a stub below.
 import os
 
 # Must run before `app` is imported: settings are read once at import time.
-for _var in ("GITHUB_TOKEN", "GH_TOKEN", "GITHUB_WEBHOOK_SECRET", "DATABASE_URL"):
+for _var in ("GITHUB_TOKEN", "GH_TOKEN", "GITHUB_WEBHOOK_SECRET"):
     os.environ.pop(_var, None)
 os.environ["DIFFLENS_ENV_FILE"] = ""
+# The application engine points at an in-memory database so nothing on disk
+# is touched; routes get a per-test session through a dependency override.
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+# No model download during tests: the hashing backend is deterministic.
+os.environ["EMBEDDING_BACKEND"] = "hashing"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -18,11 +23,22 @@ from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
+from app.config import get_settings  # noqa: E402
 from app.db import Base, get_db  # noqa: E402
 from app.github import client as github_client  # noqa: E402
 from app.main import app  # noqa: E402
+from app.ml.embeddings import get_embedding_model  # noqa: E402
+from app.ml.similarity import FindingIndex, reset_finding_index, set_finding_index  # noqa: E402
 
 SQLALCHEMY_TEST_URL = "sqlite://"
+
+
+@pytest.fixture(autouse=True)
+def _fresh_similarity_index():
+    """Every test starts with an empty in-memory similarity corpus."""
+    reset_finding_index()
+    yield
+    reset_finding_index()
 
 
 @pytest.fixture(autouse=True)
@@ -42,26 +58,36 @@ def _no_github_network(monkeypatch):
 
 
 @pytest.fixture(scope="function")
-def db_session():
-    """Create a fresh in-memory database for each test."""
+def session_factory():
+    """A session factory on a fresh in-memory database with the schema created."""
     engine = create_engine(
         SQLALCHEMY_TEST_URL,
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    testing_session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = testing_session_local()
+    factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    try:
+        yield factory
+    finally:
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+
+
+@pytest.fixture(scope="function")
+def db_session(session_factory):
+    """A session on the per-test database."""
+    session = session_factory()
     try:
         yield session
     finally:
         session.close()
-        Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture(scope="function")
-def client(db_session):
-    """FastAPI test client with overridden database dependency."""
+def client(db_session, session_factory):
+    """FastAPI test client with the database dependency and the similarity
+    index bound to the per-test database."""
 
     def override_get_db():
         try:
@@ -69,6 +95,11 @@ def client(db_session):
         finally:
             pass
 
+    set_finding_index(
+        FindingIndex(
+            get_embedding_model(), get_settings().cluster_distance_threshold, session_factory
+        )
+    )
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c

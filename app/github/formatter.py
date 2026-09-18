@@ -35,8 +35,11 @@ def format_summary_comment(
         f"| **Files analyzed** | {analysis.summary.get('files_analyzed', 0)} |",
         f"| **Total findings** | {analysis.total_findings} |",
         f"| **Risk level** | {risk_emoji} {risk_level.upper()} ({risk_score_val:.0%}) |",
-        "",
     ]
+    seen_before = analysis.summary.get("findings_seen_before")
+    if seen_before:
+        lines.append(f"| **Seen before** | {seen_before} of {analysis.total_findings} findings |")
+    lines.append("")
 
     # Severity breakdown
     by_severity = analysis.summary.get("by_severity", {})
@@ -79,8 +82,8 @@ def format_summary_comment(
     if all_findings:
         lines.append("### Top Findings")
         lines.append("")
-        lines.append("| Severity | File | Issue |")
-        lines.append("|----------|------|-------|")
+        lines.append("| Severity | File | Issue | Seen before |")
+        lines.append("|----------|------|-------|-------------|")
         for f in all_findings:
             sev = f.get("severity", "info")
             emoji = SEVERITY_EMOJI.get(sev, "")
@@ -88,7 +91,7 @@ def format_summary_comment(
             line = f.get("line_number")
             loc = f"`{file_path}:{line}`" if line else f"`{file_path}`"
             msg = f.get("message", "")[:100]
-            lines.append(f"| {emoji} {sev} | {loc} | {msg} |")
+            lines.append(f"| {emoji} {sev} | {loc} | {msg} | {seen_before_label(f)} |")
         lines.append("")
 
     # Smart review summary
@@ -187,6 +190,8 @@ def findings_to_review_comments(analysis: AnalysisResult) -> list[dict]:
         ]
         if f.get("suggestion"):
             body_parts.append(f"\n💡 **Suggestion:** {f['suggestion']}")
+        if f.get("times_seen_before"):
+            body_parts.append(f"\n🔁 {seen_before_label(f)} in earlier reviews.")
 
         # GitHub's review API requires `side` and `subject_type` when
         # using absolute line numbers instead of diff hunk positions.
@@ -200,6 +205,16 @@ def findings_to_review_comments(analysis: AnalysisResult) -> list[dict]:
         )
 
     return comments
+
+
+def seen_before_label(finding: dict) -> str:
+    """'seen 3 times before', 'seen once before' or 'new'."""
+    count = finding.get("times_seen_before") or 0
+    if count == 0:
+        return "new"
+    if count == 1:
+        return "seen once before"
+    return f"seen {count} times before"
 
 
 def risk_level_to_status_state(risk_level: str) -> str:

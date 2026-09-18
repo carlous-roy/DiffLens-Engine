@@ -28,6 +28,15 @@ function FindingCard({ finding, categorization }) {
             <span className="text-xs text-[#4b5563] font-mono">
               {finding.analyzer || finding.file_path}
             </span>
+            {finding.times_seen_before > 0 && (
+              <span
+                className="text-[10px] font-mono px-2 py-0.5 rounded-full border"
+                style={{ color: '#F59E0B', borderColor: 'rgba(245,158,11,0.3)' }}
+                title="This issue was flagged in earlier runs"
+              >
+                seen {finding.times_seen_before}× before
+              </span>
+            )}
           </div>
 
           <p className="text-sm text-[#e4e4e7] leading-relaxed">{finding.message}</p>

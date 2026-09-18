@@ -14,9 +14,12 @@ from app.api.schemas import (
 )
 from app.config import get_settings
 from app.db import get_db
-from app.db.models import AnalysisFinding, AnalysisRun, SeverityLevel
+from app.db.models import AnalysisRun
+from app.db.persist import persist_run
+from app.ml.embeddings import embedding_status
 from app.ml.llm_provider import get_llm_provider
 from app.ml.risk_scoring import risk_model_status
+from app.ml.similarity import get_finding_index
 from app.ml.smart_review import smart_review
 
 router = APIRouter()
@@ -68,59 +71,7 @@ async def analyze_diff(request: AnalyzeRequest, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Analysis failed: {e}") from e
 
-    # Persist the run
-    run = AnalysisRun(source=request.source, summary=result.summary)
-    db.add(run)
-    db.flush()
-
-    # Persist individual findings
-    all_findings = []
-    for f in result.complexity_findings:
-        all_findings.append(
-            AnalysisFinding(
-                run_id=run.id,
-                analyzer="complexity",
-                file_path=f["file_path"],
-                line_number=f.get("line_number"),
-                severity=SeverityLevel(f["severity"].lower()),
-                message=f["message"],
-                suggestion=f.get("suggestion"),
-                metadata_={
-                    "function_name": f.get("function_name"),
-                    "complexity": f.get("complexity"),
-                },
-            )
-        )
-    for f in result.naming_findings:
-        all_findings.append(
-            AnalysisFinding(
-                run_id=run.id,
-                analyzer="naming",
-                file_path=f["file_path"],
-                line_number=f.get("line_number"),
-                severity=SeverityLevel(f["severity"].lower()),
-                message=f["message"],
-                suggestion=f.get("suggestion"),
-                metadata_={"name": f.get("name"), "kind": f.get("kind")},
-            )
-        )
-    for f in result.bug_risk_findings:
-        all_findings.append(
-            AnalysisFinding(
-                run_id=run.id,
-                analyzer="bug_risk",
-                file_path=f["file_path"],
-                line_number=f.get("line_number"),
-                severity=SeverityLevel(f["severity"].lower()),
-                message=f["message"],
-                suggestion=f.get("suggestion"),
-                metadata_={"rule_id": f.get("rule_id"), "matched_text": f.get("matched_text")},
-            )
-        )
-
-    db.add_all(all_findings)
-    db.commit()
-    db.refresh(run)
+    run = persist_run(db, result, source=request.source)
 
     # Smart review (async, optional)
     review_result = None
@@ -182,6 +133,8 @@ async def ml_status():
             "installed_models": llm_models,
         },
         "risk_model": risk_model_status(),
+        "embeddings": embedding_status(),
+        "similarity_index": get_finding_index().stats(),
         "features": {
             "smart_review": settings.ml_enable_smart_review,
             "risk_scoring": settings.ml_enable_risk_scoring,
@@ -219,6 +172,7 @@ def get_run(run_id: str, db: Session = Depends(get_db)):
         "source": run.source,
         "status": run.status,
         "summary": run.summary,
+        "risk_score": run.risk,
         "findings": [
             {
                 "id": str(f.id),
@@ -229,6 +183,8 @@ def get_run(run_id: str, db: Session = Depends(get_db)):
                 "message": f.message,
                 "suggestion": f.suggestion,
                 "metadata": f.metadata_,
+                "category": f.category,
+                "cluster_id": f.cluster_id,
             }
             for f in run.findings
         ],

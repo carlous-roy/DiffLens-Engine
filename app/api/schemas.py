@@ -24,6 +24,8 @@ class SummaryResponse(BaseModel):
     total_findings: int
     by_severity: dict
     by_analyzer: dict
+    # Findings whose cluster already had members from earlier runs.
+    findings_seen_before: int | None = None
 
 
 class AnalyzeResponse(BaseModel):

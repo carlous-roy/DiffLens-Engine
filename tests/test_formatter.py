@@ -147,3 +147,26 @@ class TestRiskMapping:
         assert risk_level_to_conclusion("low") == "success"
         assert risk_level_to_conclusion("medium") == "neutral"
         assert risk_level_to_conclusion("high") == "failure"
+
+
+class TestSeenBefore:
+    def test_labels(self):
+        from app.github.formatter import seen_before_label
+
+        assert seen_before_label({}) == "new"
+        assert seen_before_label({"times_seen_before": 1}) == "seen once before"
+        assert seen_before_label({"times_seen_before": 4}) == "seen 4 times before"
+
+    def test_summary_comment_reports_repeats(self):
+        finding = {**SAMPLE_FINDINGS[0], "times_seen_before": 3}
+        analysis = _make_analysis(complexity=[finding])
+        analysis.summary["findings_seen_before"] = 1
+        comment = format_summary_comment(analysis)
+        assert "| **Seen before** | 1 of 1 findings |" in comment
+        assert "| seen 3 times before |" in comment
+
+    def test_inline_comment_mentions_repeats(self):
+        finding = {**SAMPLE_FINDINGS[0], "times_seen_before": 2}
+        analysis = _make_analysis(complexity=[finding])
+        comments = findings_to_review_comments(analysis)
+        assert "seen 2 times before in earlier reviews" in comments[0]["body"]

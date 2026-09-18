@@ -2,14 +2,14 @@
 
 Revision ID: 002_github_prs
 Revises: 001_initial
-Create Date: 2025-02-25
+Create Date: 2026-08-30
 """
 
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-
 from alembic import op
+
 from app.db.models import UUIDType
 
 # revision identifiers, used by Alembic.

@@ -22,7 +22,9 @@ from sqlalchemy.orm import relationship
 
 from app.db import Base
 
-# Custom UUID column type
+EMBEDDING_DIM = 384
+
+# Custom column types
 
 
 class UUIDType(types.TypeDecorator):
@@ -51,6 +53,35 @@ class UUIDType(types.TypeDecorator):
         return value if isinstance(value, uuid.UUID) else uuid.UUID(value)
 
 
+class EmbeddingType(types.TypeDecorator):
+    """A finding embedding: pgvector `vector(384)` on PostgreSQL, JSON elsewhere.
+
+    Values are bound from any float sequence and come back as float32 arrays.
+    """
+
+    impl = types.JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            from pgvector.sqlalchemy import Vector
+
+            return dialect.type_descriptor(Vector(EMBEDDING_DIM))
+        return dialect.type_descriptor(types.JSON())
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return [float(x) for x in value]
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        import numpy as np
+
+        return np.asarray(value, dtype=np.float32)
+
+
 # Enums
 
 
@@ -77,6 +108,8 @@ class AnalysisRun(Base):
     source = Column(String(50), nullable=False, default="api")
     status = Column(String(20), nullable=False, default="completed")
     summary = Column(JSON, nullable=True)
+    # Risk score, categorization summary and similarity method of the run.
+    risk = Column(JSON, nullable=True)
 
     findings = relationship("AnalysisFinding", back_populates="run", cascade="all, delete-orphan")
     github_pr = relationship(
@@ -108,6 +141,13 @@ class AnalysisFinding(Base):
     suggestion = Column(Text, nullable=True)
     # Extra structured data (e.g. complexity score, matched pattern)
     metadata_ = Column("metadata", JSON, nullable=True)
+    # Keyword-rule category (security, correctness, ...)
+    category = Column(String(50), nullable=True)
+    # Embedding of the finding text, the model that produced it, and the
+    # cluster of repeat findings it was assigned to.
+    embedding = Column(EmbeddingType(), nullable=True)
+    embedding_model = Column(String(100), nullable=True)
+    cluster_id = Column(Integer, nullable=True, index=True)
 
     run = relationship("AnalysisRun", back_populates="findings")
 
