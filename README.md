@@ -274,7 +274,7 @@ The most relevant:
 
 ```bash
 pip install -r requirements-dev.txt
-pytest --cov=app                # 285 tests in 19 files, hermetic (no network, no .env)
+pytest --cov=app                # 290 tests in 19 files, hermetic (no network, no .env)
 ruff check . && ruff format --check .
 python scripts/train_risk_model.py   # downloads ApacheJIT, retrains, rewrites docs/MODEL_CARD.md
 ```
