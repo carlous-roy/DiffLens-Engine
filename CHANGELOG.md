@@ -2,7 +2,7 @@
 
 Dates are the dates of the commits on the `main` branch.
 
-## Unreleased (branch `hardening`)
+## Unreleased
 
 ### Static analysis
 - Rules run over a copy of the source in which Tree-sitter comment and string
@@ -52,7 +52,7 @@ Dates are the dates of the commits on the `main` branch.
   committed; GitHub Actions CI (ruff, pytest with coverage, frontend and
   Docker builds); hermetic test suite.
 
-## 1.0.0 — 2026-03-15 (README and migration fixes 2026-08-30)
+## 1.0.0 (2026-03-15; README and migration fixes on 2026-08-30)
 
 - Static analysis pipeline: cyclomatic complexity via Tree-sitter, naming
   convention checks, bug-risk patterns.

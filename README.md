@@ -10,11 +10,11 @@
 </p>
 
 DiffLens reviews Python and Java diffs. It parses the changed code with
-Tree-sitter, measures cyclomatic complexity and nesting depth, runs naming and
-bug-risk rules that only match code (never comments or strings), scores the
-change with a gradient-boosting model trained on defect-inducing commits,
-finds related findings from earlier runs, and posts the result on GitHub pull
-requests as a commit status, a summary comment that is updated on each push,
+Tree-sitter, measures cyclomatic complexity and nesting depth, and runs naming
+and bug-risk rules that only match code, never comments or strings. A
+gradient-boosting model trained on defect-inducing commits scores the change,
+earlier runs supply related findings, and the result goes to the GitHub pull
+request as a commit status, a summary comment that is updated on each push,
 and inline review comments at the right lines.
 
 The browser demo at difflens.roycarlous.com is a separate JavaScript build of
@@ -26,35 +26,39 @@ the rule engine; it does not run this service or its risk model.
 
 ### Static analysis
 
-- **Parsing.** Each changed file is parsed with Tree-sitter (`tree-sitter-python`,
-  `tree-sitter-java`). The analyzers see the hunks as they read after the change
-  (context plus added lines) and report only on added lines. Line numbers are
-  mapped back to the new file through the hunk headers, so a finding on a
-  modified file points at the real line, which is what inline PR comments need.
-- **Cyclomatic complexity and nesting depth** per function or method, computed
-  from the syntax tree. Decision points (`if`, `elif`, loops, `except`, `case`,
-  boolean operators, comprehensions, ternaries; in Java also `&&`/`||` and
-  `case` groups) add to the complexity. Nesting depth counts nested control-flow
-  statements; an `else if` chain is one level. A depth of four or more is
-  reported as its own finding. A function is measured when its definition line
-  is part of the change.
-- **Bug-risk rules.** Nine Python and six Java rules (`eval()`/`exec()`, bare
-  `except`, silently swallowed exceptions, mutable default arguments,
-  `== None`, `global`, wildcard imports, `.equals(null)`, empty `catch`, string
-  comparison with `==`, `System.out`, manual threads, TODO markers). The rules
-  are line patterns, but they run over a masked copy of the source in which the
-  syntax tree's comment and string-content nodes are blanked out. `eval(` in a
-  comment or inside a string literal is not a finding; `eval(` inside an
-  f-string `{...}` is, because that is code. TODO rules run on comment nodes
-  only.
-- **Naming.** Class, function, method, field, parameter and variable names are
-  read from definition nodes: PEP 8 style for Python (snake_case functions,
-  variables and parameters, PascalCase classes, SCREAMING_SNAKE_CASE module
-  constants; CapWords type aliases are allowed) and Java style (PascalCase
-  types, camelCase methods, fields and locals, SCREAMING_SNAKE_CASE for
-  `static final`). Constructors are never mistaken for methods.
-- **Categories.** Keyword rules sort findings into security, correctness,
-  performance, maintainability and style, with a per-analyzer default.
+Each changed file is parsed with Tree-sitter (`tree-sitter-python`,
+`tree-sitter-java`). The analyzers see the hunks as they read after the change
+(context plus added lines) and report only on added lines. Line numbers are
+mapped back to the new file through the hunk headers, so a finding on a
+modified file points at the real line, which is what inline PR comments need.
+
+Cyclomatic complexity and nesting depth are computed per function or method
+from the syntax tree. Decision points (`if`, `elif`, loops, `except`, `with`,
+`assert`, `case`, boolean operators, comprehensions, ternaries; in Java also
+`&&`/`||` and `case` groups) add to the complexity. Nesting depth counts nested
+control-flow statements; an `else if` chain is one level. A depth of four or
+more is reported as its own finding. A function is measured when its definition
+line is part of the change.
+
+The bug-risk rules are nine Python and six Java line patterns: `eval()`/`exec()`,
+bare `except`, silently swallowed exceptions, mutable default arguments,
+`== None`, `is True`, `global`, wildcard imports, `.equals(null)`, empty
+`catch`, string comparison with `==`, `System.out`, manual threads and TODO
+markers. They run over a masked copy of the source in which the syntax tree's
+comment and string-content nodes are blanked out. `eval(` in a comment or
+inside a string literal is not a finding; `eval(` inside an f-string `{...}`
+is, because that is code. The TODO rules run on comment nodes only.
+
+Names are read from definition nodes: classes, functions, methods, fields,
+parameters and variables. Python is checked against PEP 8 (snake_case
+functions, variables and parameters, PascalCase classes, SCREAMING_SNAKE_CASE
+module constants; CapWords type aliases are allowed) and Java against its usual
+style (PascalCase types, camelCase methods, fields and locals,
+SCREAMING_SNAKE_CASE for `static final`). Constructors are never mistaken for
+methods.
+
+Keyword rules sort findings into security, correctness, performance,
+maintainability and style, with a per-analyzer default.
 
 ### Change-risk score
 
@@ -72,12 +76,12 @@ the rule engine; it does not run this service or its risk model.
 2. The static findings, folded into a score with a noisy-OR over per-finding
    severity weights (critical 0.30, error 0.12, warning 0.03, info 0).
 
-The final score is the noisy-OR of the two, `1 - (1 - p_model) * (1 - s_static)`,
-with levels low / medium / high at 0.3 and 0.6. Every response reports
-`model_type` (`gradient_boosting`), the model probability, the static score,
-the top per-feature attributions (change in probability when a feature is reset
-to its training median) and the formula. If the artefact is missing the service
-logs an error at startup and reports `model_type: heuristic`.
+I combine the two with a noisy-OR, `1 - (1 - p_model) * (1 - s_static)`, with
+levels low / medium / high at 0.3 and 0.6. Every response reports `model_type`
+(`gradient_boosting`), the model probability, the static score, the top
+per-feature attributions (change in probability when a feature is reset to its
+training median) and the formula. If the artefact is missing the service logs
+an error at startup and reports `model_type: heuristic`.
 
 Held-out results (newest 20% of every project's commits; test prevalence 20.0%;
 a constant prediction would score Brier 0.160):
@@ -113,8 +117,8 @@ rules did not catch, with the static findings as context, and parse its JSON
 answer into comments. The pass is off for pull requests unless
 `GITHUB_ENABLE_SMART_REVIEW=true`. Model output is flattened to plain text
 before it is posted to GitHub. `LLM_PROVIDER=stub` returns canned answers so the
-path can be tested without a model; the quality of the real model's comments
-has not been measured.
+path can be tested without a model. I have not measured the quality of the real
+model's comments.
 
 ### GitHub integration
 
@@ -156,9 +160,9 @@ analyzed pull requests, and service status.
                     └────────────────────────────┘
 ```
 
-Analysis and persistence run in a worker thread pool, not on the event loop.
-The risk model artefact (0.8 MB, `app/ml/artifacts/`) and the embedding model
-load at startup.
+Analysis and persistence run in a worker thread pool rather than on the event
+loop. The risk model artefact (0.8 MB, `app/ml/artifacts/`) and the embedding
+model load at startup.
 
 ---
 
@@ -174,7 +178,7 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
-Four containers start: `difflens-db` (pgvector/pgvector 0.8.6-pg17),
+Four containers start: `difflens-db` (pgvector/pgvector 0.8.6-pg17-bookworm),
 `difflens-ollama` (ollama 0.18.3), `difflens-app` (FastAPI, port 8000) and
 `difflens-frontend` (nginx, port 3000). Only the API and the dashboard are
 published, on localhost. The app container runs the migrations at startup. The
@@ -200,7 +204,8 @@ cd frontend && npm ci && npm run dev          # dashboard on :3000, proxies /api
 ```
 
 The first request embeds findings, which downloads the ONNX model (about
-65 MB, the quantized `qdrant/bge-small-en-v1.5-onnx-q` files) into the fastembed cache; set `EMBEDDING_BACKEND=hashing` to skip that.
+65 MB, the quantized `qdrant/bge-small-en-v1.5-onnx-q` files) into the
+fastembed cache; set `EMBEDDING_BACKEND=hashing` to skip that.
 
 ```bash
 curl -s http://localhost:8000/api/v1/health
@@ -235,13 +240,13 @@ curl -s -X POST http://localhost:8000/api/v1/analyze \
 |---|---|---|---|
 | `/api/v1/analyze` | POST | key only with `enable_smart_review` | Analyze a diff or raw code (max 2 MB) |
 | `/api/v1/smart-review` | POST | `X-API-Key` | LLM review of a diff |
-| `/api/v1/runs` | GET | – | Recent runs (`limit` 1–200) |
-| `/api/v1/runs/{id}` | GET | – | Run with findings, categories, cluster ids and risk |
-| `/api/v1/health` | GET | – | Database, LLM and risk model status |
-| `/api/v1/ml/status` | GET | – | LLM, risk model, embeddings and index status |
+| `/api/v1/runs` | GET | none | Recent runs (`limit` 1 to 200) |
+| `/api/v1/runs/{id}` | GET | none | Run with findings, categories, cluster ids and risk |
+| `/api/v1/health` | GET | none | Database, LLM and risk model status |
+| `/api/v1/ml/status` | GET | none | LLM, risk model, embeddings and index status |
 | `/api/v1/github/webhook` | POST | HMAC signature | GitHub deliveries |
-| `/api/v1/github/status` | GET | – | Integration configuration (token verified hourly) |
-| `/api/v1/github/prs` | GET | – | Analyzed pull requests |
+| `/api/v1/github/status` | GET | none | Integration configuration (token verified hourly) |
+| `/api/v1/github/prs` | GET | none | Analyzed pull requests |
 | `/api/v1/github/analyze-pr` | POST | `X-API-Key` | Analyze a pull request on demand |
 
 Interactive documentation: http://localhost:8000/docs.
@@ -274,7 +279,7 @@ The most relevant:
 
 ```bash
 pip install -r requirements-dev.txt
-pytest --cov=app                # 290 tests in 19 files, hermetic (no network, no .env)
+pytest --cov=app                # 291 tests in 19 files, hermetic (no network, no .env)
 ruff check . && ruff format --check .
 python scripts/train_risk_model.py   # downloads ApacheJIT, retrains, rewrites docs/MODEL_CARD.md
 ```
@@ -282,7 +287,8 @@ python scripts/train_risk_model.py   # downloads ApacheJIT, retrains, rewrites d
 The suite clears `GITHUB_TOKEN`/`GH_TOKEN`, ignores `.env`, uses an in-memory
 database, the hashing embedding backend and a fake GitHub API over
 `httpx.MockTransport`. GitHub Actions runs ruff, the tests with coverage, the
-frontend build and both Docker builds on every push.
+frontend build and both Docker builds on every push to main and on every pull
+request.
 
 ---
 
@@ -302,11 +308,12 @@ frontend build and both Docker builds on every push.
 - Clusters of repeat findings are as good as the embeddings of short rule
   messages; different functions with the same complexity message stay apart
   only because their names differ.
-- The LLM pass is unevaluated: no measurement exists of how often its comments
+- The LLM pass is unevaluated. I have no measurement of how often its comments
   are correct.
 - The PostgreSQL/pgvector path is exercised by compiling its query in the test
   suite, not by running against a database in CI.
-- Two languages. Adding one means writing its rules, not only adding a grammar.
+- Two languages. Adding one means writing its rules as well as adding a
+  grammar.
 
 ---
 
@@ -327,7 +334,7 @@ DiffLens-Engine/
 │   ├── config/            settings
 │   ├── logging_config.py
 │   └── main.py
-├── alembic/               migrations 001–004
+├── alembic/               migrations 001 to 004
 ├── scripts/train_risk_model.py
 ├── docs/MODEL_CARD.md
 ├── frontend/              React + Vite dashboard
