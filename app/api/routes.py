@@ -1,5 +1,6 @@
 """Core REST API routes for DiffLens."""
 
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -26,6 +27,7 @@ from app.ml.risk_scoring import risk_model_status
 from app.ml.similarity import get_finding_index
 from app.ml.smart_review import smart_review
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 settings = get_settings()
 
@@ -85,7 +87,10 @@ async def analyze_diff(
         # Parsing and scoring are CPU-bound: keep them off the event loop.
         result = await run_in_threadpool(run_analysis, request.diff, request.enable_ml)
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Analysis failed: {e}") from e
+        # The traceback goes to the log; the client only learns that the
+        # input could not be analyzed.
+        logger.exception("Analysis of a submitted diff failed.")
+        raise HTTPException(status_code=422, detail="The diff could not be analyzed.") from e
 
     run = await run_in_threadpool(persist_run, db, result, request.source)
 
@@ -120,7 +125,8 @@ async def standalone_smart_review(request: SmartReviewRequest):
         result = await smart_review(request.diff)
         return result.to_dict()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Smart review failed: {e}") from e
+        logger.exception("Smart review failed.")
+        raise HTTPException(status_code=500, detail="Smart review failed.") from e
 
 
 @router.get("/ml/status")

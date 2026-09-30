@@ -105,3 +105,18 @@ def test_health_and_ml_status_report_the_risk_model(client):
     status = client.get("/api/v1/ml/status").json()
     assert status["risk_model"]["loaded"] is True
     assert "base_url" not in status["llm"]
+
+
+def test_analysis_failure_is_logged_not_echoed(client, monkeypatch, caplog):
+    """An internal failure answers 422 without the exception text in the body."""
+    from app.api import routes
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("internal detail: parser state 0x1f")
+
+    monkeypatch.setattr(routes, "run_analysis", _boom)
+    with caplog.at_level("ERROR", logger="app.api.routes"):
+        response = client.post("/api/v1/analyze", json={"diff": MINIMAL_PYTHON_DIFF})
+    assert response.status_code == 422
+    assert "internal detail" not in response.text
+    assert any("Analysis of a submitted diff failed" in r.message for r in caplog.records)
