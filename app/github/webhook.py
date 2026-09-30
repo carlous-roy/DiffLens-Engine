@@ -1,4 +1,4 @@
-"""GitHub webhook handler — receives, verifies, and dispatches webhook events."""
+"""GitHub webhook handling: signature verification and event filtering."""
 
 import hashlib
 import hmac
@@ -63,7 +63,7 @@ PR_ACTIONS_TO_ANALYZE = {"opened", "synchronize", "reopened"}
 def should_analyze_event(event_type: str, payload: dict) -> bool:
     """Determine whether a webhook event should trigger DiffLens analysis."""
     if event_type == "ping":
-        logger.info("Received GitHub ping event — webhook is configured correctly.")
+        logger.info("Received GitHub ping event; the webhook is configured correctly.")
         return False
 
     if event_type != "pull_request":

@@ -81,7 +81,7 @@ class LLMProvider:
                     tokens_used=data.get("eval_count"),
                 )
         except httpx.ConnectError:
-            logger.warning("Ollama not reachable at %s — is it running?", self.base_url)
+            logger.warning("Ollama is not reachable at %s.", self.base_url)
             return LLMResponse(
                 content="",
                 model=self.model,
@@ -182,6 +182,7 @@ _provider: LLMProvider | None = None
 
 
 def get_llm_provider() -> LLMProvider:
+    """The process-wide provider, created from the settings on first use."""
     global _provider
     if _provider is None:
         _provider = LLMProvider()

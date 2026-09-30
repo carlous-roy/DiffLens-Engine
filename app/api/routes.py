@@ -32,7 +32,7 @@ settings = get_settings()
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check(db: Session = Depends(get_db)):
-    """Health check endpoint — verifies database and LLM connectivity."""
+    """Health check: database and LLM connectivity, plus the loaded risk model."""
     db_status = "healthy"
     try:
         db.execute(text("SELECT 1"))

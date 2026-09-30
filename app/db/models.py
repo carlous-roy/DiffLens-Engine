@@ -99,8 +99,8 @@ class SeverityLevel(enum.StrEnum):
 
 
 class AnalysisRun(Base):
-    """A single analysis invocation — triggered by the API, the GitHub webhook,
-    or a manual run, and holding the summary of everything that was found."""
+    """A single analysis invocation, triggered by the API, the GitHub webhook
+    or a manual run, holding the summary of everything that was found."""
 
     __tablename__ = "analysis_runs"
 

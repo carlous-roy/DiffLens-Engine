@@ -1,4 +1,4 @@
-"""GitHub output formatter — converts DiffLens results into GitHub-friendly formats."""
+"""Format analysis results as GitHub comments, reviews and check-run annotations."""
 
 import re
 

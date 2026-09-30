@@ -1,1 +1,1 @@
-"""GitHub integration — webhook handling, API client, and PR analysis."""
+"""GitHub integration: webhook handling, API client and pull request analysis."""

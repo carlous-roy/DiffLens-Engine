@@ -117,9 +117,9 @@ class TestWebhookEndpoint:
         assert resp.status_code == 401
 
     def test_non_ascii_signature_is_rejected_not_an_error(self):
-        """Servers hand header values over as latin-1 text; a non-ASCII
-        digest used to make `hmac.compare_digest` raise, turning a bad
-        signature into a 500."""
+        """Servers hand header values over as latin-1 text. A non-ASCII digest
+        makes `hmac.compare_digest` raise, and that must count as a bad
+        signature rather than become a 500."""
         from app.github.webhook import verify_webhook_signature
 
         assert verify_webhook_signature(b"body", "sha256=d\u00e9adbeef", secret="s") is False

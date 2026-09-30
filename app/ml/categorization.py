@@ -1,4 +1,4 @@
-"""Auto-categorization — classifies findings by impact category."""
+"""Keyword rules that sort findings into impact categories."""
 
 import logging
 import re
@@ -28,7 +28,7 @@ class CategorizationResult:
 
     categorized: list[CategorizedFinding]
     summary: dict  # count per category
-    method: str  # "keyword" or "llm"
+    method: str  # "keyword"
 
     def to_dict(self) -> dict:
         return {

@@ -58,6 +58,7 @@ app.include_router(github_router, prefix="/api/v1")
 
 @app.get("/")
 def root():
+    """Service name, version and the paths a client needs first."""
     return {
         "name": settings.app_name,
         "version": settings.app_version,

@@ -1,4 +1,4 @@
-"""Analysis pipeline — the main orchestrator."""
+"""Analysis pipeline: parse the diff, run the analyzers, then the scoring modules."""
 
 from dataclasses import asdict, dataclass, field
 

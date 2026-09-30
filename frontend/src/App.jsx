@@ -8,7 +8,7 @@ import RunDetailPage from './pages/RunDetailPage'
 import StatusPage from './pages/StatusPage'
 import GitHubPage from './pages/GitHubPage'
 
-/** Navigation pill — active state uses subtle white bg like portfolio nav. */
+/** Navigation pill; the active item gets a faint white background. */
 function NavItem({ to, icon: Icon, children }) {
   return (
     <NavLink
@@ -27,7 +27,7 @@ function NavItem({ to, icon: Icon, children }) {
   )
 }
 
-/** DiffLens logo mark — gradient circle with monogram. */
+/** DiffLens logo mark: a gradient circle with the monogram. */
 function Logo() {
   return (
     <div className="flex items-center gap-2.5">
@@ -49,7 +49,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen flex flex-col noise-overlay relative">
-        {/* ─── Fixed navbar (portfolio style: blur + border-b) ─── */}
+        {/* Fixed navbar */}
         <nav className="fixed top-0 left-0 right-0 z-[100] h-16 flex items-center justify-between px-6 bg-[#08080c]/85 backdrop-blur-2xl border-b border-border">
           <Logo />
           <div className="flex items-center gap-1">
@@ -60,7 +60,7 @@ export default function App() {
           </div>
         </nav>
 
-        {/* ─── Main content (offset for fixed nav) ─── */}
+        {/* Main content, offset for the fixed navbar */}
         <main className="flex-1 max-w-[1100px] mx-auto w-full px-6 pt-24 pb-12">
           <Routes>
             <Route path="/" element={<AnalyzePage />} />
@@ -71,7 +71,7 @@ export default function App() {
           </Routes>
         </main>
 
-        {/* ─── Footer ─── */}
+        {/* Footer */}
         <footer className="border-t border-border py-5">
           <div className="max-w-[1100px] mx-auto px-6 flex items-center justify-between text-xs text-[#4b5563]">
             <span>DiffLens · Static analysis and change-risk scoring</span>

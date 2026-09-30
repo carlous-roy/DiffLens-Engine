@@ -130,13 +130,13 @@ def test_pipeline_handles_raw_code():
 
     code = "from os import *\ndef ProcessData(data, cache={}):\n    eval(data)\n    pass"
     result = run_analysis(code, enable_ml=False)
-    # Should detect findings — not return 0
+    # The sample has several rule violations, so findings are expected.
     assert result.files_analyzed == 1
     assert result.total_findings > 0
 
 
 def test_pipeline_still_handles_diffs():
-    """Ensure normal diffs still work after adding auto-detect."""
+    """A unified diff is parsed as a diff, not wrapped as raw code."""
     from app.analysis.pipeline import run_analysis
 
     diff = """diff --git a/f.py b/f.py

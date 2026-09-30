@@ -1,4 +1,4 @@
-"""Smart Code Review — LLM-powered review comment generation."""
+"""The optional LLM review pass: prompt construction and response parsing."""
 
 import json
 import logging

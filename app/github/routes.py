@@ -75,7 +75,7 @@ async def receive_webhook(
     if event_type == "ping":
         return {
             "status": "ok",
-            "message": "Pong! DiffLens webhook is configured.",
+            "message": "Pong. DiffLens webhook is configured.",
             "hook_id": payload.get("hook_id"),
         }
 
@@ -193,8 +193,8 @@ _identity_cache: dict = {"login": None, "error": None, "checked_at": 0.0, "token
 async def token_identity() -> dict:
     """Login of the configured token, verified at most once an hour.
 
-    Every status request used to call GitHub; the result is now cached so
-    the dashboard cannot burn the token's rate limit.
+    The result is cached so that a dashboard polling the status endpoint
+    cannot burn the token's rate limit.
     """
     settings = get_settings()
     if not settings.github_token:

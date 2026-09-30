@@ -24,4 +24,5 @@ def check_api_key(provided: str | None) -> None:
 async def require_api_key(
     x_api_key: str | None = Header(default=None, alias=API_KEY_HEADER),
 ) -> None:
+    """Route dependency: reject the request unless the API key header matches."""
     check_api_key(x_api_key)

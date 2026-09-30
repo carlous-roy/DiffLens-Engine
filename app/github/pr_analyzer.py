@@ -1,4 +1,4 @@
-"""PR analysis service — orchestrates the full GitHub PR review flow."""
+"""The GitHub pull request flow: status, diff, history, analysis, comments, persistence."""
 
 from __future__ import annotations
 

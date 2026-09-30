@@ -71,7 +71,7 @@ export default function AnalyzePage() {
 
   return (
     <div className="space-y-8">
-      {/* ─── Input section ─── */}
+      {/* Input */}
       <div className="animate-fade-in">
         <div className="flex items-center justify-between mb-5">
           <div>
@@ -139,7 +139,7 @@ export default function AnalyzePage() {
         )}
       </div>
 
-      {/* ─── Results ─── */}
+      {/* Results */}
       {result && (
         <div className="space-y-6">
           <div className="flex items-center gap-3 text-xs text-[#4b5563] animate-fade-in">
