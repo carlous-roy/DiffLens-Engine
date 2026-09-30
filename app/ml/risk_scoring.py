@@ -24,7 +24,6 @@ to a hand-weighted heuristic; `model_type` says which path produced a score.
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import threading
 from dataclasses import asdict, dataclass, field
@@ -45,7 +44,6 @@ logger = logging.getLogger(__name__)
 
 ARTIFACT_DIR = Path(__file__).resolve().parent / "artifacts"
 ARTIFACT_PATH = ARTIFACT_DIR / "risk_model.joblib"
-METADATA_PATH = ARTIFACT_DIR / "risk_model.json"
 ARTIFACT_FORMAT_VERSION = 2
 
 # Per-finding weights for the static score: each finding is treated as an
@@ -493,11 +491,3 @@ def _heuristic_score(
         },
         warnings=["Risk model artefact not found; scores come from the heuristic fallback."],
     )
-
-
-def read_model_metadata(path: Path = METADATA_PATH) -> dict | None:
-    """The JSON sidecar written by the training script (metrics, dataset)."""
-    try:
-        return json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        return None

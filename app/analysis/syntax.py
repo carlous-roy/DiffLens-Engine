@@ -26,8 +26,6 @@ except Exception:  # pragma: no cover - exercised only when the wheels are missi
     TREE_SITTER_AVAILABLE = False
     Node = Parser = Tree = object  # type: ignore[misc,assignment]
 
-SUPPORTED_LANGUAGES = frozenset({"python", "java"})
-
 # Node types whose whole extent is a comment.
 COMMENT_NODE_TYPES: dict[str, frozenset[str]] = {
     "python": frozenset({"comment"}),

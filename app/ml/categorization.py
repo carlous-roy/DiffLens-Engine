@@ -1,10 +1,7 @@
 """Keyword rules that sort findings into impact categories."""
 
-import logging
 import re
 from dataclasses import asdict, dataclass
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
