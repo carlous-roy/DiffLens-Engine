@@ -78,7 +78,7 @@ export default function StatusPage() {
           <StatusCard icon={Database} title="Database" status={health?.database || 'unknown'}
             details={{ Backend: health?.database_backend || '—', Status: health?.database || '—' }} />
           <StatusCard icon={Brain} title="LLM (Ollama)" status={health?.llm || 'disabled'}
-            details={mlStatus?.llm ? { Provider: mlStatus.llm.provider, Model: mlStatus.llm.model, URL: mlStatus.llm.base_url, 'Models installed': mlStatus.llm.installed_models?.length || 0 } : undefined} />
+            details={mlStatus?.llm ? { Provider: mlStatus.llm.provider, Model: mlStatus.llm.model, 'Models installed': mlStatus.llm.installed_models?.length || 0 } : undefined} />
           <StatusCard icon={Cpu} title="Risk Model" status={mlStatus?.risk_model?.loaded ? 'active' : 'heuristic fallback'}
             details={mlStatus?.risk_model ? {
               Type: mlStatus.risk_model.model_type,
