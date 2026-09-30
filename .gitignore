@@ -32,13 +32,15 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
-# Docker
+# Logs
 *.log
 
 # Test / Coverage
 .coverage
+coverage.xml
 htmlcov/
 .pytest_cache/
+.ruff_cache/
 .mypy_cache/
 
 # Database
